@@ -13,7 +13,7 @@ NSMutableDictionary *configuration;
     NSString *deploymentKey = [infoDictionary objectForKey:@"CodePushDeploymentKey"];
     NSString *serverUrl = [infoDictionary objectForKey:@"CodePushServerUrl"];
     if (!serverUrl) {
-        serverUrl = @"https://codepush.azurewebsites.net/";
+        serverUrl = @"http://localhost:3000/";
     }
     NSString *rootComponent = [infoDictionary objectForKey:@"CFBundleName"];
     
