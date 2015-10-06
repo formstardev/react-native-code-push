@@ -18,10 +18,6 @@ var Button = require("react-native-button");
 var CodePush = require('react-native-code-push');
 
 var CodePushDemoApp = React.createClass({
-
-  getInitialState: function() {
-    return {};
-  },
   componentDidMount: function() {
     this.checkUpdate();
   },
@@ -36,10 +32,9 @@ var CodePushDemoApp = React.createClass({
   },
   handlePress: function() {
     this.state.update.download().done((localPackage) => {
-      localPackage.apply().done();
+      localPackage.apply(1000).done();
     });
   },
-
   render: function() {
     var updateView;
     if (this.state.update) {
@@ -55,7 +50,14 @@ var CodePushDemoApp = React.createClass({
     return (
       <View style={styles.container}>
         <Text style={styles.welcome}>
-          Welcome to Code Push!
+          Welcome to React Native!
+        </Text>
+        <Text style={styles.instructions}>
+          To get started, edit index.ios.js
+        </Text>
+        <Text style={styles.instructions}>
+          Press Cmd+R to reload,{'\n'}
+          Cmd+D or shake for dev menu
         </Text>
         {updateView}
       </View>
