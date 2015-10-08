@@ -68,26 +68,25 @@ var NoRemotePackageWithSameAppVersionTest = React.createClass({
     
     var mockConfiguration = { appVersion : "1.0.0" };
     CodePushSdk.setUpTestDependencies(mockAcquisitionSdk, mockConfiguration, NativeBridge);
-    
-    CodePushSdk.getCurrentPackage = function () {
-      return Promise.resolve(localPackage);
-    }
-    callWhenDone();
+    NativeBridge.writeToLocalPackage(localPackage, function(err){
+      if (err) {
+        throw new Error('Setup: Error removing local package');
+      } else {
+        callWhenDone();
+      }
+    });
   },
   
   runTest() {
-    CodePushSdk.checkForUpdate().then(
-      (update) => {
-        if (update) {
-          throw new Error('SDK should not return a package if remote package is of a different version');
-        } else {
-          this.setState({done: true}, RCTTestModule.markTestCompleted);
-        }
-      },
-      (err) => {
+    CodePushSdk.queryUpdate((err, update) => {
+      if (update) {
+        throw new Error('SDK should not return a package if remote package is of a different version');
+      } else if (err) {
         throw new Error(err.message);
-      },
-    );
+      } else {
+        this.setState({done: true}, RCTTestModule.markTestCompleted);
+      }
+    });
   },
 
   render() {

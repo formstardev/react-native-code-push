@@ -50,18 +50,15 @@ var NoRemotePackageTest = React.createClass({
   },
   
   runTest() {
-    CodePushSdk.checkForUpdate().then(
-      (update) => {
-        if (update) {
-          throw new Error('SDK should not return a package if remote does not contain a package');
-        } else {
-          this.setState({done: true}, RCTTestModule.markTestCompleted);
-        }
-      },
-      (err) => {
+    CodePushSdk.queryUpdate((err, update) => {
+      if (update) {
+        throw new Error('SDK should not return a package if remote does not contain a package');
+      } else if (err) {
         throw new Error(err.message);
-      },
-    );
+      } else {
+        this.setState({done: true}, RCTTestModule.markTestCompleted);
+      }
+    });
   },
 
   render() {

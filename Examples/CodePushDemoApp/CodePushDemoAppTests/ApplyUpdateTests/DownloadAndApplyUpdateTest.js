@@ -38,9 +38,7 @@ var DownloadAndApplyUpdateTest = React.createClass({
   
   runTest() {
     var update = require("./TestPackage");
-    NativeBridge.downloadUpdate(update).done((downloadedPackage) => {
-      NativeBridge.applyUpdate(downloadedPackage, 1000);
-    });
+    CodePushSdk.installUpdate(update);
   },
 
   render() {
