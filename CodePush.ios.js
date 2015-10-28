@@ -10,7 +10,6 @@ var NativeCodePush = require('react-native').NativeModules.CodePush;
 var requestFetchAdapter = require("./request-fetch-adapter.js");
 var Sdk = require("code-push/script/acquisition-sdk").AcquisitionManager;
 var packageMixins = require("./package-mixins")(NativeCodePush);
-var { AlertIOS } = require("react-native");
 
 // This function is only used for tests. Replaces the default SDK, configuration and native bridge
 function setUpTestDependencies(providedTestSdk, providedTestConfig, testNativeBridge){
@@ -96,52 +95,12 @@ function notifyApplicationReady() {
   return NativeCodePush.notifyApplicationReady();
 }
 
-function sync(options = {}) {  
-  return new Promise((resolve, reject) => {
-    checkForUpdate()
-      .then((remotePackage) => {
-        if (!remotePackage) {
-          resolve(CodePush.SyncStatus.NO_UPDATE_AVAILABLE);
-        }
-        else {
-          var dialogButtons = [
-            {
-              text: options.updateButtonText || "Update",
-              onPress: () => { 
-                remotePackage.download()
-                  .then((localPackage) => {
-                    resolve(CodePush.SyncStatus.APPLY_SUCCESS);
-                    localPackage.apply(options.rollbackTimeout);
-                  }, reject);
-              }
-            }
-          ];
-          
-          if (!remotePackage.isMandatory) {
-            dialogButtons.push({
-              text: options.ignoreButtonText || "Ignore",
-              onPress: () => resolve(CodePush.SyncStatus.UPDATE_IGNORED)
-            });
-          }
-          
-          AlertIOS.alert(options.updateTitle || "Update available", remotePackage.description, dialogButtons);
-        }
-      }, reject);
-  });     
-};
-
 var CodePush = {
   getConfiguration: getConfiguration,
   checkForUpdate: checkForUpdate,
   getCurrentPackage: getCurrentPackage,
   notifyApplicationReady: notifyApplicationReady,
-  setUpTestDependencies: setUpTestDependencies,
-  sync: sync,
-  SyncStatus: {
-    NO_UPDATE_AVAILABLE: 0,
-    UPDATE_IGNORED: 1,
-    APPLY_SUCCESS: 2    
-  }
+  setUpTestDependencies: setUpTestDependencies
 };
 
 module.exports = CodePush;
