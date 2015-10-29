@@ -10,6 +10,7 @@ var NativeCodePush = require('react-native').NativeModules.CodePush;
 var requestFetchAdapter = require("./request-fetch-adapter.js");
 var Sdk = require("code-push/script/acquisition-sdk").AcquisitionManager;
 var packageMixins = require("./package-mixins")(NativeCodePush);
+var { AlertIOS } = require("react-native");
 
 // This function is only used for tests. Replaces the default SDK, configuration and native bridge
 function setUpTestDependencies(providedTestSdk, providedTestConfig, testNativeBridge){
@@ -95,12 +96,75 @@ function notifyApplicationReady() {
   return NativeCodePush.notifyApplicationReady();
 }
 
+function sync(options = {}) {  
+  var syncOptions = {
+    ignoreFailedUpdates: true,
+    
+    mandatoryContinueButtonLabel: "Continue",
+    mandatoryUpdateMessage: "An update is available that must be installed",
+    
+    optionalIgnoreButtonLabel: "Ignore",
+    optionalInstallButtonLabel: "Install",
+    optionalUpdateMessage: "An update is available. Would you like to install it?",
+    
+    updateTitle: "Update available",
+    rollbackTimeout: 0,
+    
+    ...options 
+  };
+
+  return new Promise((resolve, reject) => {
+    checkForUpdate()
+      .then((remotePackage) => {
+        if (!remotePackage || (remotePackage.failedAppy && syncOptions.ignoreFailedUpdates)) {
+          resolve(CodePush.SyncStatus.NO_UPDATE_AVAILABLE);
+        }
+        else {
+          var message = null;
+          var dialogButtons = [
+            {
+              text: null,
+              onPress: () => { 
+                remotePackage.download()
+                  .then((localPackage) => {
+                    resolve(CodePush.SyncStatus.APPLY_SUCCESS);
+                    localPackage.apply(syncOptions.rollbackTimeout);
+                  }, reject);
+              }
+            }
+          ];
+          
+          if (remotePackage.isMandatory) {
+            message = syncOptions.mandatoryUpdateMessage;
+            dialogButtons[0].text = syncOptions.mandatoryContinueButtonLabel;
+          } else {
+            message = syncOptions.optionalUpdateMessage;
+
+            dialogButtons[0].text = syncOptions.optionalInstallButtonLabel;            
+            dialogButtons.push({
+              text: syncOptions.optionalIgnoreButtonLabel,
+              onPress: () => resolve(CodePush.SyncStatus.UPDATE_IGNORED)
+            });
+          }
+          
+          AlertIOS.alert(syncOptions.updateTitle, message || remotePackage.description, dialogButtons);
+        }
+      }, reject);
+  });     
+};
+
 var CodePush = {
   getConfiguration: getConfiguration,
   checkForUpdate: checkForUpdate,
   getCurrentPackage: getCurrentPackage,
   notifyApplicationReady: notifyApplicationReady,
-  setUpTestDependencies: setUpTestDependencies
+  setUpTestDependencies: setUpTestDependencies,
+  sync: sync,
+  SyncStatus: {
+    NO_UPDATE_AVAILABLE: 0,
+    UPDATE_IGNORED: 1,
+    APPLY_SUCCESS: 2    
+  }
 };
 
 module.exports = CodePush;

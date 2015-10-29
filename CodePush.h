@@ -2,8 +2,6 @@
 
 @interface CodePush : NSObject <RCTBridgeModule>
 
-+ (NSString *) getDocumentsDirectory;
-
 + (NSURL *) getBundleUrl;
 
 @end
