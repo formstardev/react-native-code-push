@@ -1,62 +1,22 @@
 'use strict';
 
-var { AlertIOS } = require("react-native");
-var NativeCodePush = require("react-native").NativeModules.CodePush;
-var packageMixins = require("./package-mixins")(NativeCodePush);
 var requestFetchAdapter = require("./request-fetch-adapter.js");
 var Sdk = require("code-push/script/acquisition-sdk").AcquisitionManager;
+var { NativeCodePush, PackageMixins, Alert } = require("./CodePushNativePlatformAdapter");
 
-function checkForUpdate() {
-  var config;
-  var sdk;
-  
-  return getConfiguration()
-          .then((configResult) => {
-            config = configResult;
-            return getSdk();
-          })
-          .then((sdkResult) => {
-            sdk = sdkResult;
-            return getCurrentPackage();
-          })
-          .then((localPackage) => {
-            var queryPackage = { appVersion: config.appVersion };
-            if (localPackage && localPackage.appVersion === config.appVersion) {
-              queryPackage = localPackage;
-            }
-
-            return new Promise((resolve, reject) => {
-              sdk.queryUpdateWithCurrentPackage(queryPackage, (err, update) => {
-                if (err) {
-                  return reject(err);
-                }
-                
-                // Ignore updates that require a newer app version,
-                // since the end-user couldn't reliably install it
-                if (!update || update.updateAppVersion) {
-                  return resolve(null);
-                }
-
-                update = Object.assign(update, packageMixins.remote);
-                
-                NativeCodePush.isFailedUpdate(update.packageHash)
-                  .then((isFailedHash) => {
-                    update.failedInstall = isFailedHash;
-                    resolve(update);
-                  })
-                  .catch(reject)
-                  .done();
-              })
-            });
-          });
+// This function is only used for tests. Replaces the default SDK, configuration and native bridge
+function setUpTestDependencies(providedTestSdk, providedTestConfig, testNativeBridge){
+  if (providedTestSdk) testSdk = providedTestSdk;
+  if (providedTestConfig) testConfig = providedTestConfig;
+  if (testNativeBridge) NativeCodePush = testNativeBridge;
 }
-
-var isConfigValid = true;
+var testConfig;
+var testSdk;
 
 var getConfiguration = (() => {
   var config;
   return function getConfiguration() {
-    if (config && isConfigValid) {
+    if (config) {
       return Promise.resolve(config);
     } else if (testConfig) {
       return Promise.resolve(testConfig);
@@ -64,7 +24,6 @@ var getConfiguration = (() => {
       return NativeCodePush.getConfiguration()
         .then((configuration) => {
           if (!config) config = configuration;
-          isConfigValid = true;
           return config;
         });
     }
@@ -109,33 +68,55 @@ function getCurrentPackage() {
   });
 }
 
+function checkForUpdate() {
+  var config;
+  var sdk;
+  
+  return getConfiguration()
+          .then((configResult) => {
+            config = configResult;
+            return getSdk();
+          })
+          .then((sdkResult) => {
+            sdk = sdkResult;
+            // Allow dynamic overwrite of function. This is only to be used for tests.
+            return module.exports.getCurrentPackage();
+          })
+          .then((localPackage) => {
+            var queryPackage = { appVersion: config.appVersion };
+            if (localPackage && localPackage.appVersion === config.appVersion) {
+              queryPackage = localPackage;
+            }
+
+            return new Promise((resolve, reject) => {
+              sdk.queryUpdateWithCurrentPackage(queryPackage, (err, update) => {
+                if (err) {
+                  return reject(err);
+                }
+                
+                // Ignore updates that require a newer app version,
+                // since the end-user couldn't reliably install it
+                if (!update || update.updateAppVersion) {
+                  return resolve(null);
+                }
+
+                update = Object.assign(update, PackageMixins.remote);
+                
+                NativeCodePush.isFailedUpdate(update.packageHash)
+                  .then((isFailedHash) => {
+                    update.failedInstall = isFailedHash;
+                    resolve(update);
+                  })
+                  .catch(reject)
+                  .done();
+              })
+            });
+          });
+}
+
 /* Logs messages to console with the [CodePush] prefix */
 function log(message) {
   console.log(`[CodePush] ${message}`)
-}
-
-function restartApp(rollbackTimeout = 0) {
-  NativeCodePush.restartApp(rollbackTimeout);
-}
-
-function setDeploymentKey(deploymentKey) {
-  return NativeCodePush.setDeploymentKey(deploymentKey)
-    .then(() => {
-        // Mark the local copy of the config data
-        // as invalid since we just modified it
-        // on the native end.
-        isConfigValid = false;
-    });  
-}
-
-var testConfig;
-var testSdk;
-
-// This function is only used for tests. Replaces the default SDK, configuration and native bridge
-function setUpTestDependencies(providedTestSdk, providedTestConfig, testNativeBridge) {
-  if (providedTestSdk) testSdk = providedTestSdk;
-  if (providedTestConfig) testConfig = providedTestConfig;
-  if (testNativeBridge) NativeCodePush = testNativeBridge;
 }
 
 /**
@@ -269,7 +250,7 @@ function sync(options = {}, syncStatusChangeCallback, downloadProgressCallback) 
           }
           
           syncStatusChangeCallback(CodePush.SyncStatus.AWAITING_USER_ACTION);
-          AlertIOS.alert(syncOptions.updateDialog.title, message, dialogButtons);
+          Alert.alert(syncOptions.updateDialog.title, message, dialogButtons);
         } else {
           doDownloadAndInstall();
         }
@@ -288,8 +269,6 @@ var CodePush = {
   getCurrentPackage: getCurrentPackage,
   log: log,
   notifyApplicationReady: NativeCodePush.notifyApplicationReady,
-  restartApp: restartApp,
-  setDeploymentKey: setDeploymentKey,
   setUpTestDependencies: setUpTestDependencies,
   sync: sync,
   InstallMode: {

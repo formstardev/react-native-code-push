@@ -1,83 +1,85 @@
 #import "CodePush.h"
 
-@implementation CodePushConfig {
-    NSMutableDictionary *_configDictionary;
-}
+NSMutableDictionary *configuration;
 
-static CodePushConfig *_currentConfig;
-
-static NSString * const AppVersionConfigKey = @"appVersion";
-static NSString * const BuildVdersionConfigKey = @"buildVersion";
-static NSString * const DeploymentKeyConfigKey = @"deploymentKey";
-static NSString * const ServerURLConfigKey = @"serverUrl";
-
-+ (instancetype)current
-{
-    return _currentConfig;
-}
+@implementation CodePushConfig
 
 + (void)initialize
 {
-    _currentConfig = [[CodePushConfig alloc] init];
-}
-
-- (instancetype)init
-{
-    self = [super init];
     NSDictionary *infoDictionary = [[NSBundle mainBundle] infoDictionary];
     
     NSString *appVersion = [infoDictionary objectForKey:@"CFBundleShortVersionString"];
     NSString *buildVersion = [infoDictionary objectForKey:(NSString *)kCFBundleVersionKey];
     NSString *deploymentKey = [infoDictionary objectForKey:@"CodePushDeploymentKey"];
-    NSString *serverURL = [infoDictionary objectForKey:@"CodePushServerURL"];
-    
-    if (!serverURL) {
-        serverURL = @"https://codepush.azurewebsites.net/";
+    NSString *serverUrl = [infoDictionary objectForKey:@"CodePushServerUrl"];
+    if (!serverUrl) {
+        serverUrl = @"https://codepush.azurewebsites.net/";
     }
+    NSString *rootComponent = [infoDictionary objectForKey:@"CFBundleName"];
     
-    _configDictionary = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
-                            appVersion,AppVersionConfigKey,
-                            buildVersion,BuildVdersionConfigKey,
-                            serverURL,ServerURLConfigKey,
-                            deploymentKey,DeploymentKeyConfigKey,
-                            nil];
-    
-    return self;
+    configuration = [[NSMutableDictionary alloc]
+                                   initWithObjectsAndKeys:
+                                   appVersion,@"appVersion",
+                                   buildVersion,@"buildVersion",
+                                   deploymentKey,@"deploymentKey",
+                                   serverUrl,@"serverUrl",
+                                   rootComponent,@"rootComponent",
+                                   nil];
 }
 
-- (NSString *)appVersion
++ (void)setDeploymentKey:(NSString *)deploymentKey
 {
-    return [_configDictionary objectForKey:AppVersionConfigKey];
+    [configuration setValue:deploymentKey forKey:@"deploymentKey"];
 }
 
-- (NSString *)buildVersion
++ (NSString *)getDeploymentKey
 {
-    return [_configDictionary objectForKey:BuildVdersionConfigKey];
+    return [configuration objectForKey:@"deploymentKey"];
 }
 
-- (NSDictionary *)configuration
++ (void)setServerUrl:(NSString *)serverUrl
 {
-    return _configDictionary;
+    [configuration setValue:serverUrl forKey:@"serverUrl"];
 }
 
-- (NSString *)deploymentKey
++ (NSString *)getServerUrl
 {
-    return [_configDictionary objectForKey:DeploymentKeyConfigKey];
+    return [configuration objectForKey:@"serverUrl"];
 }
 
-- (NSString *)serverURL
++ (void)setAppVersion:(NSString *)appVersion
 {
-    return [_configDictionary objectForKey:ServerURLConfigKey];
+    [configuration setValue:appVersion forKey:@"appVersion"];
 }
 
-- (void)setDeploymentKey:(NSString *)deploymentKey
++ (NSString *)getAppVersion
 {
-    [_configDictionary setValue:deploymentKey forKey:DeploymentKeyConfigKey];
+    return [configuration objectForKey:@"appVersion"];
 }
 
-- (void)setServerURL:(NSString *)serverURL
++ (void)setBuildVersion:(NSString *)buildVersion
 {
-    [_configDictionary setValue:serverURL forKey:ServerURLConfigKey];
+    [configuration setValue:buildVersion forKey:@"buildVersion"];
+}
+
++ (NSString *)getBuildVersion
+{
+    return [configuration objectForKey:@"buildVersion"];
+}
+
++ (void)setRootComponent:(NSString *)rootComponent
+{
+    [configuration setValue:rootComponent forKey:@"rootComponent"];
+}
+
++ (NSString *)getRootComponent
+{
+    return [configuration objectForKey:@"rootComponent"];
+}
+
++ (NSDictionary *) getConfiguration
+{
+    return configuration;
 }
 
 @end
