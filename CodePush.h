@@ -4,10 +4,10 @@
 
 + (NSURL *)bundleURL;
 
-+ (NSURL *)bundleURLForResource:(NSString *)resourceName;
++ (NSURL *)bundleURLForResourceName:(NSString *)resourceName;
 
-+ (NSURL *)bundleURLForResource:(NSString *)resourceName
-                  withExtension:(NSString *)resourceExtension;
++ (NSURL *)bundleURLForResourceName:(NSString *)resourceName
+                      withExtension:(NSString *)resourceExtension;
 
 + (NSString *)getDocumentsDirectory;
 

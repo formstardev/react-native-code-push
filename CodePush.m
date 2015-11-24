@@ -27,17 +27,17 @@ static NSString * const PendingUpdateRollbackTimeoutKey = @"rollbackTimeout";
 
 + (NSURL *)bundleURL
 {
-    return [self bundleURLForResource:@"main"];
+    return [self bundleURLForResourceName:@"main"];
 }
 
-+ (NSURL *)bundleURLForResource:(NSString *)resourceName
++ (NSURL *)bundleURLForResourceName:(NSString *)resourceName
 {
-    return [self bundleURLForResource:resourceName
-                        withExtension:@"jsbundle"];
+    return [self bundleURLForResourceName:resourceName
+                            withExtension:@"jsbundle"];
 }
 
-+ (NSURL *)bundleURLForResource:(NSString *)resourceName
-                  withExtension:(NSString *)resourceExtension
++ (NSURL *)bundleURLForResourceName:(NSString *)resourceName
+                      withExtension:(NSString *)resourceExtension
 {
     NSError *error;
     NSString *packageFile = [CodePushPackage getCurrentPackageBundlePath:&error];
