@@ -1,10 +1,8 @@
 'use strict';
 
-var { AlertIOS } = require("react-native");
-var NativeCodePush = require("react-native").NativeModules.CodePush;
-var packageMixins = require("./package-mixins")(NativeCodePush);
 var requestFetchAdapter = require("./request-fetch-adapter.js");
 var Sdk = require("code-push/script/acquisition-sdk").AcquisitionManager;
+var { NativeCodePush, PackageMixins, Alert } = require("./CodePushNativePlatformAdapter");
 
 function checkForUpdate(deploymentKey = null) {
   var config;
@@ -25,14 +23,14 @@ function checkForUpdate(deploymentKey = null) {
           })
           .then((sdkResult) => {
             sdk = sdkResult;
-            return getCurrentPackage();
+            // Allow dynamic overwrite of function. This is only to be used for tests.
+            return module.exports.getCurrentPackage();
           })
           .then((localPackage) => {
             var queryPackage = { appVersion: config.appVersion };
             if (localPackage && localPackage.appVersion === config.appVersion) {
               queryPackage = localPackage;
             }
-
             return new Promise((resolve, reject) => {
               sdk.queryUpdateWithCurrentPackage(queryPackage, (err, update) => {
                 if (err) {
@@ -45,7 +43,7 @@ function checkForUpdate(deploymentKey = null) {
                   return resolve(null);
                 }
 
-                update = Object.assign(update, packageMixins.remote);
+                update = Object.assign(update, PackageMixins.remote);
                 
                 NativeCodePush.isFailedUpdate(update.packageHash)
                   .then((isFailedHash) => {
@@ -261,7 +259,7 @@ function sync(options = {}, syncStatusChangeCallback, downloadProgressCallback) 
           }
           
           syncStatusChangeCallback(CodePush.SyncStatus.AWAITING_USER_ACTION);
-          AlertIOS.alert(syncOptions.updateDialog.title, message, dialogButtons);
+          Alert.alert(syncOptions.updateDialog.title, message, dialogButtons);
         } else {
           doDownloadAndInstall();
         }
