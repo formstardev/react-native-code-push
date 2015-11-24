@@ -1,8 +1,20 @@
 'use strict';
 
+var NativeCodePush = require("react-native").NativeModules.CodePush;
 var requestFetchAdapter = require("./request-fetch-adapter.js");
 var Sdk = require("code-push/script/acquisition-sdk").AcquisitionManager;
-var { NativeCodePush, PackageMixins, Alert } = require("./CodePushNativePlatformAdapter");
+var packageMixins = require("./package-mixins")(NativeCodePush);
+
+var { AlertIOS } = require("react-native");
+
+// This function is only used for tests. Replaces the default SDK, configuration and native bridge
+function setUpTestDependencies(providedTestSdk, providedTestConfig, testNativeBridge){
+  if (providedTestSdk) testSdk = providedTestSdk;
+  if (providedTestConfig) testConfig = providedTestConfig;
+  if (testNativeBridge) NativeCodePush = testNativeBridge;
+}
+var testConfig;
+var testSdk;
 
 function checkForUpdate() {
   var config;
@@ -15,14 +27,14 @@ function checkForUpdate() {
           })
           .then((sdkResult) => {
             sdk = sdkResult;
-            // Allow dynamic overwrite of function. This is only to be used for tests.
-            return module.exports.getCurrentPackage();
+            return getCurrentPackage();
           })
           .then((localPackage) => {
             var queryPackage = { appVersion: config.appVersion };
             if (localPackage && localPackage.appVersion === config.appVersion) {
               queryPackage = localPackage;
             }
+
             return new Promise((resolve, reject) => {
               sdk.queryUpdateWithCurrentPackage(queryPackage, (err, update) => {
                 if (err) {
@@ -35,7 +47,7 @@ function checkForUpdate() {
                   return resolve(null);
                 }
 
-                update = Object.assign(update, PackageMixins.remote);
+                update = Object.assign(update, packageMixins.remote);
                 
                 NativeCodePush.isFailedUpdate(update.packageHash)
                   .then((isFailedHash) => {
@@ -49,12 +61,10 @@ function checkForUpdate() {
           });
 }
 
-var isConfigValid = true;
-
 var getConfiguration = (() => {
   var config;
   return function getConfiguration() {
-    if (config && isConfigValid) {
+    if (config) {
       return Promise.resolve(config);
     } else if (testConfig) {
       return Promise.resolve(testConfig);
@@ -62,7 +72,6 @@ var getConfiguration = (() => {
       return NativeCodePush.getConfiguration()
         .then((configuration) => {
           if (!config) config = configuration;
-          isConfigValid = true;
           return config;
         });
     }
@@ -110,30 +119,6 @@ function getCurrentPackage() {
 /* Logs messages to console with the [CodePush] prefix */
 function log(message) {
   console.log(`[CodePush] ${message}`)
-}
-
-function restartApp(rollbackTimeout = 0) {
-  NativeCodePush.restartApp(rollbackTimeout);
-}
-
-function setDeploymentKey(deploymentKey) {
-  return NativeCodePush.setDeploymentKey(deploymentKey)
-    .then(() => {
-        // Mark the local copy of the config data
-        // as invalid since we just modified it
-        // on the native end.
-        isConfigValid = false;
-    });  
-}
-
-var testConfig;
-var testSdk;
-
-// This function is only used for tests. Replaces the default SDK, configuration and native bridge
-function setUpTestDependencies(providedTestSdk, providedTestConfig, testNativeBridge) {
-  if (providedTestSdk) testSdk = providedTestSdk;
-  if (providedTestConfig) testConfig = providedTestConfig;
-  if (testNativeBridge) NativeCodePush = testNativeBridge;
 }
 
 /**
@@ -229,7 +214,7 @@ function sync(options = {}, syncStatusChangeCallback, downloadProgressCallback) 
           if (typeof syncOptions.updateDialog !== "object") {
             syncOptions.updateDialog = CodePush.DEFAULT_UPDATE_DIALOG;
           } else {
-            syncOptions.updateDialog = Object.assign({}, CodePush.DEFAULT_UPDATE_DIALOG, syncOptions.updateDialog);
+            syncOptions.updateDialog = Object.assign(CodePush.DEFAULT_UPDATE_DIALOG, syncOptions.updateDialog);
           }
           
           var message = null;
@@ -267,12 +252,13 @@ function sync(options = {}, syncStatusChangeCallback, downloadProgressCallback) 
           }
           
           syncStatusChangeCallback(CodePush.SyncStatus.AWAITING_USER_ACTION);
-          Alert.alert(syncOptions.updateDialog.title, message, dialogButtons);
+          AlertIOS.alert(syncOptions.updateDialog.title, message, dialogButtons);
         } else {
           doDownloadAndInstall();
         }
       })
       .catch((error) => {
+        console.log(error);
         syncStatusChangeCallback(CodePush.SyncStatus.UNKNOWN_ERROR);
         reject(error);
       })
@@ -286,10 +272,15 @@ var CodePush = {
   getCurrentPackage: getCurrentPackage,
   log: log,
   notifyApplicationReady: NativeCodePush.notifyApplicationReady,
-  restartApp: restartApp,
-  setDeploymentKey: setDeploymentKey,
+  restartApp: NativeCodePush.restartApp,
+  setDeploymentKey: NativeCodePush.setDeploymentKey,
   setUpTestDependencies: setUpTestDependencies,
   sync: sync,
+  AutoSyncMode: {
+    NONE: NativeCodePush.codePushAutoSyncModeNone,
+    ON_START: NativeCodePush.codePushAutoSyncModeOnStart,
+    ON_RESUME: NativeCodePush.codePushAutoSyncModeOnResume
+  },
   InstallMode: {
     IMMEDIATE: NativeCodePush.codePushInstallModeImmediate, // Restart the app immediately
     ON_NEXT_RESTART: NativeCodePush.codePushInstallModeOnNextRestart, // Don't artificially restart the app. Allow the update to be "picked up" on the next app restart

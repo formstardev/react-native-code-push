@@ -27,17 +27,17 @@ static NSString * const PendingUpdateRollbackTimeoutKey = @"rollbackTimeout";
 
 + (NSURL *)bundleURL
 {
-    return [self bundleURLForResourceName:@"main"];
+    return [self bundleURLForResource:@"main"];
 }
 
-+ (NSURL *)bundleURLForResourceName:(NSString *)resourceName
++ (NSURL *)bundleURLForResource:(NSString *)resourceName
 {
-    return [self bundleURLForResourceName:resourceName
-                            withExtension:@"jsbundle"];
+    return [self bundleURLForResource:resourceName
+                        withExtension:@"jsbundle"];
 }
 
-+ (NSURL *)bundleURLForResourceName:(NSString *)resourceName
-                      withExtension:(NSString *)resourceExtension
++ (NSURL *)bundleURLForResource:(NSString *)resourceName
+                  withExtension:(NSString *)resourceExtension
 {
     NSError *error;
     NSString *packageFile = [CodePushPackage getCurrentPackageBundlePath:&error];
@@ -119,7 +119,7 @@ static NSString * const PendingUpdateRollbackTimeoutKey = @"rollbackTimeout";
     return @{ @"codePushInstallModeOnNextRestart":@(CodePushInstallModeOnNextRestart),
               @"codePushInstallModeImmediate": @(CodePushInstallModeImmediate),
               @"codePushInstallModeOnNextResume": @(CodePushInstallModeOnNextResume)
-            };
+              };
 };
 
 - (void)dealloc
@@ -326,8 +326,8 @@ RCT_EXPORT_METHOD(isFailedUpdate:(NSString *)packageHash
 }
 
 RCT_EXPORT_METHOD(isFirstRun:(NSString *)packageHash
-                     resolve:(RCTPromiseResolveBlock)resolve
-                    rejecter:(RCTPromiseRejectBlock)reject)
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
 {
     NSError *error;
     BOOL isFirstRun = didUpdate
@@ -339,19 +339,27 @@ RCT_EXPORT_METHOD(isFirstRun:(NSString *)packageHash
 }
 
 RCT_EXPORT_METHOD(notifyApplicationReady:(RCTPromiseResolveBlock)resolve
-                                rejecter:(RCTPromiseRejectBlock)reject)
+                  rejecter:(RCTPromiseRejectBlock)reject)
 {
     [self cancelRollbackTimer];
     resolve([NSNull null]);
 }
 
-RCT_EXPORT_METHOD(restartApp:(int)rollbackTimeout){
+RCT_EXPORT_METHOD(restartApp)
+{
+    [self checkForPendingUpdate:YES];
+}
+
+// This version of restart app is exposed solely for immediately installed
+// update support, and shouldn't be consumed directly by user code.
+RCT_EXPORT_METHOD(restartAppInternal:(int)rollbackTimeout)
+{
     [self initializeUpdateWithRollbackTimeout:rollbackTimeout needsRestart:YES];
 }
 
 RCT_EXPORT_METHOD(setDeploymentKey:(NSString *)deploymentKey
-                           resolve:(RCTPromiseResolveBlock)resolve
-                          rejecter:(RCTPromiseRejectBlock)reject)
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
 {
     [[CodePushConfig current] setDeploymentKey:deploymentKey];
     resolve(nil);

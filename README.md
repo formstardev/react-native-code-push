@@ -15,7 +15,7 @@ that isn't currently covered well by sync, please [let us know](mailto:codepushf
 ## Supported React Native platforms
 
 - iOS
-- Android
+- Coming soon: Android (Try it out on [this branch](https://github.com/Microsoft/react-native-code-push/tree/first-check-in-for-android))
 
 ## How does it work?
 
@@ -31,7 +31,7 @@ Acquire the React Native CodePush plugin by running the following command within
 npm install --save react-native-code-push
 ```
 
-## Plugin Installation - iOS
+## Plugin Installation 
 
 Once you've acquired the CodePush plugin, you need to integrate it into the Xcode project of your React Native app. To do this, take the following steps:
 
@@ -50,27 +50,7 @@ Add a new value, `$(SRCROOT)/../node_modules/react-native-code-push` and select 
 
     ![Add CodePush library reference](https://cloud.githubusercontent.com/assets/516559/10322038/b8157962-6c30-11e5-9264-494d65fd2626.png)
 
-## Plugin Installation - Android
-
-To integrate CodePush into your Android project, do the following steps:
-
-1. In your `android/settings.gradle` file, make the following additions:
-    
-    ```gradle
-    include ':app', ':react-native-code-push'
-    project(':react-native-code-push').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-code-push/android/app')
-    ```
-2. In your `android/app/build.gradle` file, add CodePush as one of the dependencies:
-    
-    ```gradle
-    ...
-    dependencies {
-        ...
-        compile project(':react-native-code-push')
-    }
-    ```
-
-## Plugin Configuration - iOS
+## Plugin Configuration
 
 Once your Xcode project has been setup to build/link the CodePush plugin, you need to configure your app to consult CodePush for the location of your JS bundle, since it will "take control" of managing the current and all future versions. To do this, perform the following steps:
 
@@ -94,7 +74,7 @@ Once your Xcode project has been setup to build/link the CodePush plugin, you ne
 
 This change configures your app to always load the most recent version of your app's JS bundle. On the initial launch, this will correspond to the file that was compiled with the app. However, after an update has been pushed via CodePush, this will return the location of the most recently installed update.
 
-*NOTE: The `bundleURL` method assumes your app's JS bundle is named `main.jsbundle`. If you have configured your app to use a different file name, simply call the `bundleURLForResourceName:` method (which assumes you're using the `.jsbundle` extension) or `bundleURLForResourceName:withExtension:` method instead, in order to overwrite that default behavior*
+*NOTE: The `bundleURL` method assumes your app's JS bundle is named `main.jsbundle`. If you have configured your app to use a different file name, simply call the `bundleURLForResource:` method (which assumes you're using the `.jsbundle` extension) or `bundleURLForResource:withExtension:` method instead, in order to overwrite that default behavior*
 
 To let the CodePush runtime know which deployment it should query for updates against, perform the following steps:
 
@@ -102,60 +82,6 @@ To let the CodePush runtime know which deployment it should query for updates ag
 2. In your app's `Info.plist` make sure your `CFBundleShortVersionString` value is a valid [semver](http://semver.org/) version (e.g. 1.0.0 not 1.0)
 
 *NOTE: If you'd prefer, you can also set the deployment key in code by assigning the key to the `[CodePushConfig current].deploymentKey` property.*
-
-## Plugin Configuration - Android
-
-After installing the plugin and sync-ing your Android Studio project with Gradle, you need to configure your app to consult CodePush for the location of your JS bundle, since it will "take control" of managing the current and all future versions. To do this, perform the following steps:
-
-1. Initialize the module in MainActivity.java:
-    
-    ```java
-    ...
-    // 1. Import the plugin class
-    import com.microsoft.reactnativecodepush.CodePush;
-    
-    // 2. Optional: extend FragmentActivity if you intend to show a dialog prompting users about updates.
-    public class MainActivity extends FragmentActivity implements DefaultHardwareBackBtnHandler {
-        ...
-        
-        @Override
-        protected void onCreate(Bundle savedInstanceState) {
-            ...
-            // 3. Initialize CodePush with your deployment key and an instance of your MainActivity.
-            // You can also set the deployment key in code by assigning the key to the `[CodePushConfig current].deploymentKey` property.*
-            CodePush codePush = new CodePush("d73bf5d8-4fbd-4e55-a837-accd328a21ba", this);
-            ...
-            mReactInstanceManager = ReactInstanceManager.builder()
-                    .setApplication(getApplication())
-                    ...
-                    // 4. DELETE THIS LINE --> .setBundleAssetName("index.android.bundle")
-                    
-                    // 5. Let CodePush determine which location to load the most updated bundle from.
-                    // If there is no updated bundle from CodePush, the location will be the assets
-                    // folder with the name of the bundle passed in, e.g. index.android.bundle
-                    .setJSBundleFile(codePush.getBundleUrl("index.android.bundle"))
-                    
-                    // 6. Expose the CodePush module to JavaScript.
-                    .addPackage(codePush.getReactPackage())
-                    ...
-        }
-    }
-    ```
-
-2. Let the CodePush runtime know which deployment it should query for updates against. Be sure to set the `versionName` in your `android/app/build.gradle`:
-    
-    ```gradle
-    android {
-        ...
-        defaultConfig {
-            ...
-            versionName "1.0.0"
-            ...
-        }
-        ...
-    }
-    ```
-
 ## Plugin consumption
 
 With the CodePush plugin downloaded and linked, and your app asking CodePush where to get the right JS bundle from, the only thing left is to add the neccessary code to your app to control the following:
@@ -199,7 +125,7 @@ When you require the `react-native-code-push` module, that object provides the f
 * [checkForUpdate](#codepushcheckforupdate): Queries the CodePush service for an update against the configured deployment. This method returns a promise which resolves to a `RemotePackage` that can be subsequently downloaded.
 * [getCurrentPackage](#codepushgetcurrentpackage): Gets information about the currently installed package (e.g. description, installation time)
 * [notifyApplicationReady](#codepushnotifyapplicationready): Notifies the CodePush runtime that an installed update is considered successful. This is an optional API, but is useful when you want to expicitly enable "rollback protection" in the event that an exception occurs in any code that you've deployed to production
-* [restartApp](#codepushrestartapp): Installs a pending update by immediately restarting the app.
+* [restartApp](#codepushrestartapp): Immediately restarts the app if a previously installed update is pending.
 * [setDeploymentKey](#codepushsetdeploymentkey): Dynamically updates the deployment key that the CodePush runtime will use to query for app updates.
 * [sync](#codepushsync): Allows checking for an update, downloading it and installing it, all with a single call. Unless you need custom UI and/or behavior, we recommend most developers to use this method when integrating CodePush into their apps
 
@@ -252,15 +178,15 @@ If the `rollbackTimeout` parameter was not specified, the CodePush runtime will 
 #### codePush.restartApp
 
 ```javascript
-codePush.restartApp(rollbackTimeout: Number = 0): void;
+codePush.restartApp(): void;
 ```
 
-Installs the pending update (if applicable) by immediately restarting the app, and optionally starting the rollback timer. This method is for advanced scenarios, and is useful when the following conditions are true:
+Installs a pending update (if applicable) by immediately restarting the app, and optionally starting the rollback timer. This method is for advanced scenarios, and is useful when the following conditions are true:
 
-1. Your app is specifying an install mode value of `ON_NEXT_RESTART` when calling `sync` or `LocalPackage.install`, which has the effect of not applying your update until the app has been restarted (by either the end-user or OS)
+1. Your app is specifying an install mode value of `ON_NEXT_RESTART` or `ON_NEXT_RESUME` when calling `sync` or `LocalPackage.install`, which has the effect of not applying your update until the app has been restarted (by either the end-user or OS)
 2. You have an app-specific user event (e.g. the end-user navigated back to the app's home page) that allows you to apply the update in an unobtrusive way, and potentially gets the update in front of the end-user sooner then waiting until the next restart.
 
-The `rollbackTimeout` parameter has the same behavior as the equivalent in the `sync` and `checkForUpdate` method, and allows your app to have control over the point that an update is installed, while still benefitting from rollback production. 
+If your app doesn't have a pending update, then calling this method results in a no-op. Otherwise, calling it will restart the app and start the rollback timer based on the timeout value that was specified in the previous call to `sync` or `LocalPackage.install`. 
 
 #### codePush.setDeploymentKey
 

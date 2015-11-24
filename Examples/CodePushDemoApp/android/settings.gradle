@@ -1,4 +1,0 @@
-rootProject.name = 'CodePushDemoApp'
-
-include ':app', ':react-native-code-push'
-project(':react-native-code-push').projectDir = new File(rootProject.projectDir, '../../../android/app')

@@ -1,13 +1,5 @@
-var Platform = require("Platform");
-var EventEmitter;
-
-if (Platform.OS === "android") {
-  var { DeviceEventEmitter } = require("react-native");
-  EventEmitter = DeviceEventEmitter;
-} else if (Platform.OS === "ios") {   
-  var { NativeAppEventEmitter } = require("react-native");
-  EventEmitter = NativeAppEventEmitter;
-}
+var extend = require("extend");
+var { NativeAppEventEmitter } = require("react-native");
 
 module.exports = (NativeCodePush) => {
   var remote = {
@@ -22,7 +14,7 @@ module.exports = (NativeCodePush) => {
       var downloadProgressSubscription;
       if (downloadProgressCallback) {
         // Use event subscription to obtain download progress.   
-        downloadProgressSubscription = EventEmitter.addListener(
+        downloadProgressSubscription = NativeAppEventEmitter.addListener(
           "CodePushDownloadProgress",
           downloadProgressCallback
         );
@@ -33,7 +25,7 @@ module.exports = (NativeCodePush) => {
       return NativeCodePush.downloadUpdate(this)
         .then((downloadedPackage) => {
           downloadProgressSubscription && downloadProgressSubscription.remove();
-          return Object.assign({}, downloadedPackage, local);
+          return extend({}, downloadedPackage, local);
         })
         .catch((error) => {
           downloadProgressSubscription && downloadProgressSubscription.remove();
@@ -49,7 +41,7 @@ module.exports = (NativeCodePush) => {
         .then(function() {
           updateInstalledCallback && updateInstalledCallback();
           if (installMode == NativeCodePush.codePushInstallModeImmediate) {
-            NativeCodePush.restartApp(rollbackTimeout);
+            NativeCodePush.restartAppInternal(rollbackTimeout);
           }
         });
     }
