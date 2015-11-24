@@ -2,8 +2,8 @@
 
 var React = require('react-native');
 var CodePushSdk = require('react-native-code-push');
-var { NativeCodePush } = require("react-native-code-push/CodePushNativePlatformAdapter");
-var RCTTestModule = require('NativeModules').TestModule || {};
+var NativeBridge = require('react-native').NativeModules.CodePush;
+var RCTTestModule = require('NativeModules').TestModule;
 
 var {
   Text,
@@ -45,8 +45,8 @@ var NoRemotePackageTest = React.createClass({
     };
     
     var mockConfiguration = { appVersion : "1.5.0" };
-    NativeCodePush.setUsingTestFolder(true);
-    CodePushSdk.setUpTestDependencies(mockAcquisitionSdk, mockConfiguration, NativeCodePush);
+    NativeBridge.setUsingTestFolder(true);
+    CodePushSdk.setUpTestDependencies(mockAcquisitionSdk, mockConfiguration, NativeBridge);
   },
   
   runTest() {
