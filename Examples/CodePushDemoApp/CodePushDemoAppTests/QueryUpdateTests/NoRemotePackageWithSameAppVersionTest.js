@@ -3,8 +3,7 @@
 var React = require('react-native');
 var RCTTestModule = React.NativeModules.TestModule;
 var CodePushSdk = require('react-native-code-push');
-var NativeCodePush = require("react-native").NativeModules.CodePush;
-var RCTTestModule = require('NativeModules').TestModule || {};
+var NativeBridge = require('react-native').NativeModules.CodePush;
 
 var {
   Text,
@@ -54,8 +53,8 @@ var NoRemotePackageWithSameAppVersionTest = React.createClass({
       }
     };
     
-    NativeCodePush.setUsingTestFolder(true);
-    var localPackage = {
+    NativeBridge.setUsingTestFolder(true);
+    var localPackage = JSON.stringify({
       downloadURL: "http://www.windowsazure.com/blobs/awperoiuqpweru",
       description: "Angry flappy birds",
       appVersion: "1.0.0",
@@ -65,10 +64,10 @@ var NoRemotePackageWithSameAppVersionTest = React.createClass({
       updateAppVersion: false,
       packageHash: "hash123",
       packageSize: 1024
-    };
+    });
     
     var mockConfiguration = { appVersion : "1.0.0" };
-    CodePushSdk.setUpTestDependencies(mockAcquisitionSdk, mockConfiguration, NativeCodePush);
+    CodePushSdk.setUpTestDependencies(mockAcquisitionSdk, mockConfiguration, NativeBridge);
     
     CodePushSdk.getCurrentPackage = function () {
       return Promise.resolve(localPackage);
