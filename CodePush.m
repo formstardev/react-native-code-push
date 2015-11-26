@@ -8,11 +8,11 @@
 
 @implementation CodePush {
     BOOL _hasResumeListener;
+    BOOL _isFirstRunAfterUpdate;
 }
 
 RCT_EXPORT_MODULE()
 
-static BOOL didUpdate = NO;
 static NSTimer *_timer;
 static BOOL usingTestFolder = NO;
 
@@ -129,7 +129,7 @@ static NSString *const PendingUpdateRollbackTimeoutKey = @"rollbackTimeout";
     NSDictionary *pendingUpdate = [preferences objectForKey:PendingUpdateKey];
     
     if (pendingUpdate) {
-        didUpdate = true;
+        _isFirstRunAfterUpdate = YES;
         int rollbackTimeout = [pendingUpdate[PendingUpdateRollbackTimeoutKey] intValue];
         if (0 != rollbackTimeout) {
             dispatch_async(dispatch_get_main_queue(), ^{
@@ -345,7 +345,7 @@ RCT_EXPORT_METHOD(installUpdate:(NSDictionary*)updatePackage
                                                              selector:@selector(loadBundle)
                                                                  name:UIApplicationWillEnterForegroundNotification
                                                                object:[UIApplication sharedApplication]];
-                    _hasResumeListener = true;
+                    _hasResumeListener = YES;
                 }
             }
             // Signal to JS that the update has been applied.
@@ -375,7 +375,7 @@ RCT_EXPORT_METHOD(isFirstRun:(NSString *)packageHash
                     rejecter:(RCTPromiseRejectBlock)reject)
 {
     NSError *error;
-    BOOL isFirstRun = didUpdate
+    BOOL isFirstRun = _isFirstRunAfterUpdate
                         && nil != packageHash
                         && [packageHash length] > 0
                         && [packageHash isEqualToString:[CodePushPackage getCurrentPackageHash:&error]];
@@ -394,33 +394,11 @@ RCT_EXPORT_METHOD(notifyApplicationReady:(RCTPromiseResolveBlock)resolve
 }
 
 /*
- * This method isn't publicly exposed via the "react-native-code-push"
- * module, and is only used internally to support immediately installed updates.
+ * This method is the native side of the CodePush.restartApp() method.
  */
-RCT_EXPORT_METHOD(restartImmediateUpdate:(int)rollbackTimeout)
+RCT_EXPORT_METHOD(restartApp)
 {
     [self loadBundle];
-}
-
-/*
- * This method is the native side of the CodePush.restartPendingUpdate() method.
- */
-RCT_EXPORT_METHOD(restartPendingUpdate)
-{
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
-        NSDictionary *pendingUpdate = [preferences objectForKey:PendingUpdateKey];
-        
-        if (pendingUpdate) {
-            NSError *error;
-            NSString *pendingHash = pendingUpdate[PendingUpdateHashKey];
-            NSString *currentHash = [CodePushPackage getCurrentPackageHash:&error];
-            
-            NSAssert([pendingHash isEqualToString:currentHash], @"There is a pending update but it's hash doesn't match that of the current package.");
-            
-            [self loadBundle];
-        }
-    });
 }
 
 RCT_EXPORT_METHOD(setUsingTestFolder:(BOOL)shouldUseTestFolder)
