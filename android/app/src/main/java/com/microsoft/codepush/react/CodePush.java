@@ -275,7 +275,7 @@ public class CodePush {
                     savePendingUpdate(pendingHash, rollbackTimeout);
                 }
 
-                if (installMode != CodePushInstallMode.IMMEDIATE.getValue()) {
+                if (installMode == CodePushInstallMode.IMMEDIATE.getValue()) {
                     loadBundle();
                 } else if (installMode == CodePushInstallMode.ON_NEXT_RESUME.getValue()) {
                     // Ensure we do not add the listener twice.
@@ -376,8 +376,35 @@ public class CodePush {
         }
 
         @ReactMethod
-        public void restartApp() {
+        public void restartImmediateUpdate(int rollbackTimeout) {
             loadBundle();
+        }
+
+        @ReactMethod
+        public void restartPendingUpdate() {
+            SharedPreferences settings = applicationContext.getSharedPreferences(CODE_PUSH_PREFERENCES, 0);
+            String pendingUpdateString = settings.getString(PENDING_UPDATE_KEY, null);
+
+            if (pendingUpdateString != null) {
+                try {
+                    JSONObject pendingUpdateJSON = new JSONObject(pendingUpdateString);
+                    String pendingHash = pendingUpdateJSON.getString(PENDING_UPDATE_HASH_KEY);
+                    String currentHash = codePushPackage.getCurrentPackageHash();
+                    if (!pendingHash.equals(currentHash)) {
+                        throw new CodePushUnknownException("Pending hash " + pendingHash +
+                                " and current hash " + currentHash + " are different");
+                    }
+
+                    loadBundle();
+                } catch (JSONException e) {
+                    // Should not happen.
+                    throw new CodePushUnknownException("Unable to parse pending update metadata " +
+                            pendingUpdateString + " stored in SharedPreferences", e);
+                } catch (IOException e) {
+                    // There is no current package hash.
+                    throw new CodePushUnknownException("Should not register a pending update without a saving a current package", e);
+                }
+            }
         }
 
         @Override

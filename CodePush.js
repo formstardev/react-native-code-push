@@ -267,7 +267,7 @@ var CodePush = {
   getCurrentPackage: getCurrentPackage,
   log: log,
   notifyApplicationReady: NativeCodePush.notifyApplicationReady,
-  restartApp: NativeCodePush.restartApp,
+  restartPendingUpdate: NativeCodePush.restartPendingUpdate,
   setUpTestDependencies: setUpTestDependencies,
   sync: sync,
   InstallMode: {

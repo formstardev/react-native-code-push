@@ -1,4 +1,4 @@
-var Platform = require("Platform");
+var Platform = require("react-native").Platform;
 var { DeviceEventEmitter } = require("react-native");
 
 module.exports = (NativeCodePush) => {
@@ -41,7 +41,7 @@ module.exports = (NativeCodePush) => {
         .then(function() {
           updateInstalledCallback && updateInstalledCallback();
           if (installMode == NativeCodePush.codePushInstallModeImmediate) {
-            NativeCodePush.restartApp();
+            NativeCodePush.restartImmediateUpdate(rollbackTimeout);
           };
         });
     }
