@@ -259,13 +259,13 @@ RCT_EXPORT_METHOD(downloadUpdate:(NSDictionary*)updatePackage
 {
     [CodePushPackage downloadPackage:updatePackage
         // The download is progressing forward
-        progressCallback:^(long long expectedContentLength, long long receivedContentLength) {
+        progressCallback:^(long expectedContentLength, long receivedContentLength) {
             // Notify the script-side about the progress
             [self.bridge.eventDispatcher
                 sendDeviceEventWithName:@"CodePushDownloadProgress"
                 body:@{
-                        @"totalBytes":[NSNumber numberWithLongLong:expectedContentLength],
-                        @"receivedBytes":[NSNumber numberWithLongLong:receivedContentLength]
+                        @"totalBytes":[NSNumber numberWithLong:expectedContentLength],
+                        @"receivedBytes":[NSNumber numberWithLong:receivedContentLength]
                       }];
         }
         // The download completed
