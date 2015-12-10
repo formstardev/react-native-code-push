@@ -167,7 +167,6 @@ function sync(options = {}, syncStatusChangeCallback, downloadProgressCallback) 
     deploymentKey: null,
     ignoreFailedUpdates: true,
     installMode: CodePush.InstallMode.ON_NEXT_RESTART,
-    rollbackTimeout: 0,
     updateDialog: null,
     
     ...options 
@@ -219,12 +218,6 @@ function sync(options = {}, syncStatusChangeCallback, downloadProgressCallback) 
       };
   
   return new Promise((resolve, reject) => {
-    var rejectPromise = (error) => {
-      syncStatusChangeCallback(CodePush.SyncStatus.UNKNOWN_ERROR);
-      log(error.message); 
-      reject(error);
-    };
-    
     CodePush.notifyApplicationReady()
       .then(() => {
         syncStatusChangeCallback(CodePush.SyncStatus.CHECKING_FOR_UPDATE);
@@ -236,12 +229,12 @@ function sync(options = {}, syncStatusChangeCallback, downloadProgressCallback) 
           remotePackage.download(downloadProgressCallback)
             .then((localPackage) => {
               syncStatusChangeCallback(CodePush.SyncStatus.INSTALLING_UPDATE);
-              return localPackage.install(syncOptions.rollbackTimeout, syncOptions.installMode, () => {
+              return localPackage.install(syncOptions.installMode, () => {
                 syncStatusChangeCallback(CodePush.SyncStatus.UPDATE_INSTALLED);
                 resolve(CodePush.SyncStatus.UPDATE_INSTALLED);
               });
             })
-            .catch(rejectPromise)
+            .catch(reject)
             .done();
         }
         
@@ -298,7 +291,10 @@ function sync(options = {}, syncStatusChangeCallback, downloadProgressCallback) 
           doDownloadAndInstall();
         }
       })
-      .catch(rejectPromise)
+      .catch((error) => {
+        syncStatusChangeCallback(CodePush.SyncStatus.UNKNOWN_ERROR);
+        reject(error);
+      })
       .done();
   });     
 };
