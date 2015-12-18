@@ -1,15 +1,11 @@
-import { DeviceEventEmitter } from "react-native";
+var { Platform, DeviceEventEmitter } = require("react-native");
 
-// This function is used to augment remote and local
-// package objects with additional functionality/properties
-// beyond what is included in the metadata sent by the server.
 module.exports = (NativeCodePush) => {
-  const remote = {
-    abortDownload() {
+  var remote = {
+    abortDownload: function abortDownload() {
       return NativeCodePush.abortDownload(this);
     },
-    
-    download(downloadProgressCallback) {
+    download: function download(downloadProgressCallback) {
       if (!this.downloadUrl) {
         return Promise.reject(new Error("Cannot download an update without a download url"));
       }
@@ -35,27 +31,23 @@ module.exports = (NativeCodePush) => {
           // Rethrow the error for subsequent handlers down the promise chain.
           throw error;
         });
-    },
-    
-    isPending: false // A remote package could never be in a pending state
+    }
   };
 
-  const local = {
-    install(installMode = NativeCodePush.codePushInstallModeOnNextRestart, updateInstalledCallback) {
-      let localPackage = this;
+  var local = {
+    install: function install(installMode = NativeCodePush.codePushInstallModeOnNextRestart, updateInstalledCallback) {
       return NativeCodePush.installUpdate(this, installMode)
-        .then(() => {
+        .then(function() {
           updateInstalledCallback && updateInstalledCallback();
           if (installMode == NativeCodePush.codePushInstallModeImmediate) {
             NativeCodePush.restartApp();
-          } else {
-            localPackage.isPending = true; // Mark the package as pending since it hasn't been applied yet
-          }
+          };
         });
-    },
-    
-    isPending: false // A local package wouldn't be pending until it was installed
+    }
   };
 
-  return { local, remote };
+  return {
+    remote: remote,
+    local: local
+  };
 };

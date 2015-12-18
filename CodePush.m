@@ -13,9 +13,8 @@
 
 RCT_EXPORT_MODULE()
 
-static BOOL usingTestFolder = NO;
+static BOOL testConfigurationFlag = NO;
 
-// These keys represent the names we use to store data in NSUserDefaults
 static NSString *const FailedUpdatesKey = @"CODE_PUSH_FAILED_UPDATES";
 static NSString *const PendingUpdateKey = @"CODE_PUSH_PENDING_UPDATE";
 
@@ -24,10 +23,7 @@ static NSString *const PendingUpdateKey = @"CODE_PUSH_PENDING_UPDATE";
 static NSString *const PendingUpdateHashKey = @"hash";
 static NSString *const PendingUpdateIsLoadingKey = @"isLoading";
 
-// These keys are used to inspect/augment the metadata
-// that is associated with an update's package.
-static NSString *const PackageHashKey = @"packageHash";
-static NSString *const PackageIsPendingKey = @"isPending";
+id saveTestModule = nil;
 
 @synthesize bridge = _bridge;
 
@@ -72,6 +68,40 @@ static NSString *const PackageIsPendingKey = @"isPending";
     NSString *applicationSupportDirectory = [NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES) objectAtIndex:0];
     return applicationSupportDirectory;
 }
+
+/*
+ * This returns a boolean value indicating whether CodePush has
+ * been set to run under a test configuration.
+ */
++ (BOOL)isUsingTestConfiguration
+{
+    return testConfigurationFlag;
+}
+
+/* 
+ * This is used to enable an environment in which tests can be run.
+ * Specifically, it flips a boolean flag that causes bundles to be
+ * saved to a test folder and enables the ability to modify
+ * installed bundles on the fly from JavaScript.
+ */
++ (void)setUsingTestConfiguration:(BOOL)shouldUseTestConfiguration
+{
+    testConfigurationFlag = shouldUseTestConfiguration;
+}
+
+/*
+ * This is used to clean up all test updates. It can only be used
+ * when the testConfigurationFlag is set to YES, otherwise it will
+ * simply no-op.
+ */
++ (void)clearTestUpdates
+{
+    if ([CodePush isUsingTestConfiguration]) {
+        [CodePushPackage clearTestUpdates];
+        [self removePendingUpdate];
+    }
+}
+
 
 // Private API methods
 
@@ -147,25 +177,6 @@ static NSString *const PackageIsPendingKey = @"isPending";
 }
 
 /*
- * This method checks to see whether a specific package hash
- * represents a downloaded and installed update, that hasn't
- * been applied yet via an app restart.
- */
-- (BOOL)isPendingUpdate:(NSString*)packageHash
-{
-    NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
-    NSDictionary *pendingUpdate = [preferences objectForKey:PendingUpdateKey];
-
-    // If there is a pending update, whose hash is equal to the one
-    // specified, and its "state" isn't loading, then we consider it "pending".
-    BOOL updateIsPending = pendingUpdate &&
-                           [pendingUpdate[PendingUpdateIsLoadingKey] boolValue] == NO &&
-                           [pendingUpdate[PendingUpdateHashKey] isEqualToString:packageHash];
-    
-    return updateIsPending;
-}
-
-/*
  * This method updates the React Native bridge's bundle URL
  * to point at the latest CodePush update, and then restarts
  * the bridge. This isn't meant to be called directly.
@@ -179,10 +190,12 @@ static NSString *const PackageIsPendingKey = @"isPending";
         // is debugging and therefore, shouldn't be redirected to a local
         // file (since Chrome wouldn't support it). Otherwise, update
         // the current bundle URL to point at the latest update
-        if (![_bridge.bundleURL.scheme hasPrefix:@"http"]) {
-            _bridge.bundleURL = [CodePush bundleURL];
+        if ([CodePush isUsingTestConfiguration] || ![_bridge.bundleURL.scheme hasPrefix:@"http"]) {
+            NSURL *url = [CodePush bundleURL];
+            _bridge.bundleURL = url;
         }
         
+        saveTestModule = _bridge.modules[@"RCTTestModule"];
         [_bridge reload];
     });
 }
@@ -204,7 +217,7 @@ static NSString *const PackageIsPendingKey = @"isPending";
     
     // Rollback to the previous version and de-register the new update
     [CodePushPackage rollbackPackage];
-    [self removePendingUpdate];
+    [CodePush removePendingUpdate];
     [self loadBundle];
 }
 
@@ -231,10 +244,10 @@ static NSString *const PackageIsPendingKey = @"isPending";
 }
 
 /*
- * This method  is used to register the fact that a pending
+ * This method is used to register the fact that a pending
  * update succeeded and therefore can be removed.
  */
-- (void)removePendingUpdate
++ (void)removePendingUpdate
 {
     NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
     [preferences removeObjectForKey:PendingUpdateKey];
@@ -283,7 +296,7 @@ RCT_EXPORT_METHOD(downloadUpdate:(NSDictionary*)updatePackage
         // The download completed
         doneCallback:^{
             NSError *err;
-            NSDictionary *newPackage = [CodePushPackage getPackage:updatePackage[PackageHashKey] error:&err];
+            NSDictionary *newPackage = [CodePushPackage getPackage:updatePackage[@"packageHash"] error:&err];
                 
             if (err) {
                 return reject(err);
@@ -317,18 +330,12 @@ RCT_EXPORT_METHOD(getCurrentPackage:(RCTPromiseResolveBlock)resolve
 {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSError *error;
-        NSMutableDictionary *package = [[CodePushPackage getCurrentPackage:&error] mutableCopy];
-        
+        NSDictionary *package = [CodePushPackage getCurrentPackage:&error];
         if (error) {
             reject(error);
+        } else {
+            resolve(package);
         }
-        
-        // Add the "isPending" virtual property to the package at this point, so that
-        // the script-side doesn't need to immediately call back into native to populate it.
-        BOOL isPendingUpdate = [self isPendingUpdate:[package objectForKey:PackageHashKey]];
-        [package setObject:@(isPendingUpdate) forKey:PackageIsPendingKey];
-
-        resolve(package);
     });
 }
 
@@ -348,12 +355,10 @@ RCT_EXPORT_METHOD(installUpdate:(NSDictionary*)updatePackage
         if (error) {
             reject(error);
         } else {
-            [self savePendingUpdate:updatePackage[PackageHashKey]
+            [self savePendingUpdate:updatePackage[@"packageHash"]
                           isLoading:NO];
             
-            if (installMode == CodePushInstallModeImmediate) {
-                [self loadBundle];
-            } else if (installMode == CodePushInstallModeOnNextResume) {
+            if (installMode == CodePushInstallModeOnNextResume) {
                 // Ensure we do not add the listener twice.
                 if (!_hasResumeListener) {
                     // Register for app resume notifications so that we
@@ -373,7 +378,7 @@ RCT_EXPORT_METHOD(installUpdate:(NSDictionary*)updatePackage
 
 /*
  * This method isn't publicly exposed via the "react-native-code-push"
- * module, and is only used internally to populate the RemotePackage.failedInstall property.
+ * module, and is only used internally to populate the RemotePackage.failedApply property.
  */
 RCT_EXPORT_METHOD(isFailedUpdate:(NSString *)packageHash
                          resolve:(RCTPromiseResolveBlock)resolve
@@ -406,7 +411,7 @@ RCT_EXPORT_METHOD(isFirstRun:(NSString *)packageHash
 RCT_EXPORT_METHOD(notifyApplicationReady:(RCTPromiseResolveBlock)resolve
                                 rejecter:(RCTPromiseRejectBlock)reject)
 {
-    [self removePendingUpdate];
+    [CodePush removePendingUpdate];
     resolve([NSNull null]);
 }
 
@@ -418,9 +423,16 @@ RCT_EXPORT_METHOD(restartApp)
     [self loadBundle];
 }
 
-RCT_EXPORT_METHOD(setUsingTestFolder:(BOOL)shouldUseTestFolder)
+/*
+ * This method is the native side of the CodePush.downloadAndReplaceCurrentBundle()
+ * method, which is only to be used during tests and no-ops if the test configuration
+ * flag is not set.
+ */
+RCT_EXPORT_METHOD(downloadAndReplaceCurrentBundle:(NSString *)remoteBundleUrl)
 {
-    usingTestFolder = shouldUseTestFolder;
+    if ([CodePush isUsingTestConfiguration]) {
+        [CodePushPackage downloadAndReplaceCurrentBundle:remoteBundleUrl];
+    }
 }
 
 @end
