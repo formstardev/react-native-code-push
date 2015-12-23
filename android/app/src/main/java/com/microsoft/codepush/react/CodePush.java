@@ -130,22 +130,13 @@ public class CodePush {
             }
 
             ReadableMap packageMetadata = codePushPackage.getCurrentPackage();
-            Long binaryModifiedDateDuringPackageInstall = null;
-            String binaryModifiedDateDuringPackageInstallString = CodePushUtils.tryGetString(packageMetadata, BINARY_MODIFIED_TIME_KEY);
-            if (binaryModifiedDateDuringPackageInstallString != null) {
-                binaryModifiedDateDuringPackageInstall = Long.parseLong(binaryModifiedDateDuringPackageInstallString);
-            }
-
-            String pacakgeAppVersion = CodePushUtils.tryGetString(packageMetadata, "appVersion");
-            if (binaryModifiedDateDuringPackageInstall != null &&
-                    binaryModifiedDateDuringPackageInstall == binaryResourcesModifiedTime &&
-                    this.appVersion.equals(pacakgeAppVersion)) {
+            // May throw NumberFormatException.
+            Long binaryModifiedDateDuringPackageInstall = Long.parseLong(CodePushUtils.tryGetString(packageMetadata, BINARY_MODIFIED_TIME_KEY));
+            if (binaryModifiedDateDuringPackageInstall == binaryResourcesModifiedTime) {
                 CodePushUtils.logBundleUrl(packageFilePath);
                 return packageFilePath;
             } else {
                 // The binary version is newer.
-                didUpdate = false;
-                this.clearUpdates();
                 CodePushUtils.logBundleUrl(binaryJsBundleUrl);
                 return binaryJsBundleUrl;
             }
@@ -231,16 +222,12 @@ public class CodePush {
             boolean updateIsPending = pendingUpdate != null &&
                                       pendingUpdate.getBoolean(PENDING_UPDATE_IS_LOADING_KEY) == false &&
                                       pendingUpdate.getString(PENDING_UPDATE_HASH_KEY).equals(packageHash);
+                                 
             return updateIsPending;
         }
         catch (JSONException e) {
             throw new CodePushUnknownException("Unable to read pending update metadata in isPendingUpdate.", e);
         }
-    }
-
-    private void removeFailedUpdates() {
-        SharedPreferences settings = applicationContext.getSharedPreferences(CODE_PUSH_PREFERENCES, 0);
-        settings.edit().remove(FAILED_UPDATES_KEY).commit();
     }
 
     private void removePendingUpdate() {
@@ -312,10 +299,11 @@ public class CodePush {
         testConfigurationFlag = shouldUseTestConfiguration;
     }
 
-    public void clearUpdates() {
-        codePushPackage.clearUpdates();
-        removePendingUpdate();
-        removeFailedUpdates();
+    public void clearTestUpdates() {
+        if (isUsingTestConfiguration()) {
+            codePushPackage.clearTestUpdates();
+            removePendingUpdate();
+        }
     }
 
     private class CodePushNativeModule extends ReactContextBaseJavaModule {
