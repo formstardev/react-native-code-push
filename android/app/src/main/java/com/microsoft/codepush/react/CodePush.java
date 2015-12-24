@@ -67,20 +67,14 @@ public class CodePush {
 
     private Activity mainActivity;
     private Context applicationContext;
-    private final boolean isDebugMode;
 
     public CodePush(String deploymentKey, Activity mainActivity) {
-        this(deploymentKey, mainActivity, false);
-    }
-
-    public CodePush(String deploymentKey, Activity mainActivity, boolean isDebugMode) {
         SoLoader.init(mainActivity, false);
         this.deploymentKey = deploymentKey;
         this.codePushPackage = new CodePushPackage(mainActivity.getFilesDir().getAbsolutePath());
         this.mainActivity = mainActivity;
         this.applicationContext = mainActivity.getApplicationContext();
         this.deploymentKey = deploymentKey;
-        this.isDebugMode = isDebugMode;
 
         PackageInfo pInfo = null;
         try {
@@ -136,25 +130,13 @@ public class CodePush {
             }
 
             ReadableMap packageMetadata = codePushPackage.getCurrentPackage();
-            Long binaryModifiedDateDuringPackageInstall = null;
-            String binaryModifiedDateDuringPackageInstallString = CodePushUtils.tryGetString(packageMetadata, BINARY_MODIFIED_TIME_KEY);
-            if (binaryModifiedDateDuringPackageInstallString != null) {
-                binaryModifiedDateDuringPackageInstall = Long.parseLong(binaryModifiedDateDuringPackageInstallString);
-            }
-
-            String pacakgeAppVersion = CodePushUtils.tryGetString(packageMetadata, "appVersion");
-            if (binaryModifiedDateDuringPackageInstall != null &&
-                    binaryModifiedDateDuringPackageInstall == binaryResourcesModifiedTime &&
-                    this.appVersion.equals(pacakgeAppVersion)) {
+            // May throw NumberFormatException.
+            Long binaryModifiedDateDuringPackageInstall = Long.parseLong(CodePushUtils.tryGetString(packageMetadata, BINARY_MODIFIED_TIME_KEY));
+            if (binaryModifiedDateDuringPackageInstall == binaryResourcesModifiedTime) {
                 CodePushUtils.logBundleUrl(packageFilePath);
                 return packageFilePath;
             } else {
                 // The binary version is newer.
-                didUpdate = false;
-                if (!this.isDebugMode) {
-                    this.clearUpdates();
-                }
-
                 CodePushUtils.logBundleUrl(binaryJsBundleUrl);
                 return binaryJsBundleUrl;
             }
@@ -203,9 +185,7 @@ public class CodePush {
                     rollbackPackage();
                 } else {
                     // Clear the React dev bundle cache so that new updates can be loaded.
-                    if (!this.isDebugMode) {
-                        clearReactDevBundleCache();
-                    }
+                    clearReactDevBundleCache();
                     // Mark that we tried to initialize the new update, so that if it crashes,
                     // we will know that we need to rollback when the app next starts.
                     savePendingUpdate(pendingUpdate.getString(PENDING_UPDATE_HASH_KEY),
@@ -242,16 +222,12 @@ public class CodePush {
             boolean updateIsPending = pendingUpdate != null &&
                                       pendingUpdate.getBoolean(PENDING_UPDATE_IS_LOADING_KEY) == false &&
                                       pendingUpdate.getString(PENDING_UPDATE_HASH_KEY).equals(packageHash);
+                                 
             return updateIsPending;
         }
         catch (JSONException e) {
             throw new CodePushUnknownException("Unable to read pending update metadata in isPendingUpdate.", e);
         }
-    }
-
-    private void removeFailedUpdates() {
-        SharedPreferences settings = applicationContext.getSharedPreferences(CODE_PUSH_PREFERENCES, 0);
-        settings.edit().remove(FAILED_UPDATES_KEY).commit();
     }
 
     private void removePendingUpdate() {
@@ -323,10 +299,11 @@ public class CodePush {
         testConfigurationFlag = shouldUseTestConfiguration;
     }
 
-    public void clearUpdates() {
-        codePushPackage.clearUpdates();
-        removePendingUpdate();
-        removeFailedUpdates();
+    public void clearTestUpdates() {
+        if (isUsingTestConfiguration()) {
+            codePushPackage.clearTestUpdates();
+            removePendingUpdate();
+        }
     }
 
     private class CodePushNativeModule extends ReactContextBaseJavaModule {

@@ -25,7 +25,7 @@
 // The below methods are only used during tests.
 + (BOOL)isUsingTestConfiguration;
 + (void)setUsingTestConfiguration:(BOOL)shouldUseTestConfiguration;
-+ (void)clearUpdates;
++ (void)clearTestUpdates;
 
 @end
 
@@ -84,7 +84,7 @@ failCallback:(void (^)(NSError *err))failCallback;
 
 // The below methods are only used during tests.
 + (void)downloadAndReplaceCurrentBundle:(NSString *)remoteBundleUrl;
-+ (void)clearUpdates;
++ (void)clearTestUpdates;
 
 @end
 
