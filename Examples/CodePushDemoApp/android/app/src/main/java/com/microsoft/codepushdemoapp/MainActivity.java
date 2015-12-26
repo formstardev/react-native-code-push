@@ -14,6 +14,7 @@ import com.microsoft.codepush.react.CodePush;
 
 public class MainActivity extends FragmentActivity implements DefaultHardwareBackBtnHandler {
 
+    private final String TEST_FOLDER_PREFIX = "CodePushDemoAppTests/";
     private ReactInstanceManager mReactInstanceManager;
     private ReactRootView mReactRootView;
 
@@ -24,7 +25,7 @@ public class MainActivity extends FragmentActivity implements DefaultHardwareBac
         super.onCreate(savedInstanceState);
         mReactRootView = new ReactRootView(this);
 
-        codePush = new CodePush("DEPLOYMENT_KEY_HERE", this, BuildConfig.DEBUG);
+        codePush = new CodePush("DEPLOYMENT_KEY_HERE", this);
 
         ReactInstanceManager.Builder builder = ReactInstanceManager.builder()
                 .setApplication(getApplication())

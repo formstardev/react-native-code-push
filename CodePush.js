@@ -109,10 +109,6 @@ function log(message) {
   console.log(`[CodePush] ${message}`)
 }
 
-function restartApp(onlyIfUpdateIsPending = false) {
-  NativeCodePush.restartApp(onlyIfUpdateIsPending);
-}
-
 var testConfig;
 
 // This function is only used for tests. Replaces the default SDK, configuration and native bridge
@@ -269,7 +265,7 @@ const CodePush = {
   getCurrentPackage,
   log,
   notifyApplicationReady: NativeCodePush.notifyApplicationReady,
-  restartApp,
+  restartApp: NativeCodePush.restartApp,
   setUpTestDependencies,
   sync,
   InstallMode: {
@@ -299,4 +295,4 @@ const CodePush = {
   }
 };
 
-export default CodePush;
+module.exports = CodePush;

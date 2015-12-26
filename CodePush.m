@@ -61,22 +61,13 @@ static NSString *const PackageIsPendingKey = @"isPending";
     NSDictionary *appFileAttribs = [[NSFileManager defaultManager] attributesOfItemAtPath:packageFile error:nil];
     NSDate *binaryDate = [binaryFileAttributes objectForKey:NSFileModificationDate];
     NSDate *packageDate = [appFileAttribs objectForKey:NSFileModificationDate];
-    NSString *binaryAppVersion = [[CodePushConfig current] appVersion];
-    NSDictionary *currentPackageMetadata = [CodePushPackage getCurrentPackage:&error];
-    if (error || !currentPackageMetadata) {
-        NSLog(logMessageFormat, binaryJsBundleUrl);
-        return binaryJsBundleUrl;
-    }
     
-    NSString *packageAppVersion = [currentPackageMetadata objectForKey:@"appVersion"];
-    
-    if ([binaryDate compare:packageDate] == NSOrderedAscending && [binaryAppVersion isEqualToString:packageAppVersion]) {
+    if ([binaryDate compare:packageDate] == NSOrderedAscending) {
         // Return package file because it is newer than the app store binary's JS bundle
         NSURL *packageUrl = [[NSURL alloc] initFileURLWithPath:packageFile];
         NSLog(logMessageFormat, packageUrl);
         return packageUrl;
     } else {
-        [CodePush clearUpdates];
         NSLog(logMessageFormat, binaryJsBundleUrl);
         return binaryJsBundleUrl;
     }
@@ -109,13 +100,16 @@ static NSString *const PackageIsPendingKey = @"isPending";
 }
 
 /*
- * WARNING: This cleans up all downloaded and pending updates.
+ * This is used to clean up all test updates. It can only be used
+ * when the testConfigurationFlag is set to YES, otherwise it will
+ * simply no-op.
  */
-+ (void)clearUpdates
++ (void)clearTestUpdates
 {
-    [CodePushPackage clearUpdates];
-    [self removePendingUpdate];
-    [self removeFailedUpdates];
+    if ([CodePush isUsingTestConfiguration]) {
+        [CodePushPackage clearTestUpdates];
+        [self removePendingUpdate];
+    }
 }
 
 
@@ -203,11 +197,11 @@ static NSString *const PackageIsPendingKey = @"isPending";
     NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
     NSDictionary *pendingUpdate = [preferences objectForKey:PendingUpdateKey];
 
-    // If there is a pending update whose "state" isn't loading, then we consider it "pending".
-    // Additionally, if a specific hash was provided, we ensure it matches that of the pending update.
+    // If there is a pending update, whose hash is equal to the one
+    // specified, and its "state" isn't loading, then we consider it "pending".
     BOOL updateIsPending = pendingUpdate &&
                            [pendingUpdate[PendingUpdateIsLoadingKey] boolValue] == NO &&
-                           (!packageHash || [pendingUpdate[PendingUpdateHashKey] isEqualToString:packageHash]);
+                           [pendingUpdate[PendingUpdateHashKey] isEqualToString:packageHash];
     
     return updateIsPending;
 }
@@ -274,17 +268,6 @@ static NSString *const PackageIsPendingKey = @"isPending";
     
     [failedUpdates addObject:packageHash];
     [preferences setObject:failedUpdates forKey:FailedUpdatesKey];
-    [preferences synchronize];
-}
-
-/*
- * This method is used to clear away failed updates in the event that
- * a new app store binary is installed.
- */
-+ (void)removeFailedUpdates
-{
-    NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
-    [preferences removeObjectForKey:FailedUpdatesKey];
     [preferences synchronize];
 }
 
@@ -467,13 +450,9 @@ RCT_EXPORT_METHOD(notifyApplicationReady:(RCTPromiseResolveBlock)resolve
 /*
  * This method is the native side of the CodePush.restartApp() method.
  */
-RCT_EXPORT_METHOD(restartApp:(BOOL)onlyIfUpdateIsPending)
+RCT_EXPORT_METHOD(restartApp)
 {
-    // If this is an unconditional restart request, or there
-    // is current pending update, then reload the app.
-    if (!onlyIfUpdateIsPending || [self isPendingUpdate:nil]) {
-        [self loadBundle];
-    }
+    [self loadBundle];
 }
 
 /*
