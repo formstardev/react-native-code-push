@@ -1,3 +1,5 @@
+"use strict";
+
 module.exports = {
   async request(verb, url, body, callback) {
     if (typeof body === "function") {
