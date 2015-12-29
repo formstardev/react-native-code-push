@@ -187,6 +187,8 @@ public class CodePushPackage {
 
     public void rollbackPackage() throws IOException {
         WritableMap info = getCurrentPackageInfo();
+        String currentPackageFolderPath = getCurrentPackageFolderPath();
+        CodePushUtils.deleteDirectoryAtPath(currentPackageFolderPath);
         info.putString(CURRENT_PACKAGE_KEY, CodePushUtils.tryGetString(info, PREVIOUS_PACKAGE_KEY));
         info.putNull(PREVIOUS_PACKAGE_KEY);
         updateCurrentPackageInfo(info);
@@ -225,9 +227,11 @@ public class CodePushPackage {
         }
     }
 
-    public void clearUpdates() {
-        File statusFile = new File(getStatusFilePath());
-        statusFile.delete();
-        CodePushUtils.deleteDirectoryAtPath(getCodePushPath());
+    public void clearTestUpdates() {
+        if (CodePush.isUsingTestConfiguration()) {
+            File statusFile = new File(getStatusFilePath());
+            statusFile.delete();
+            CodePushUtils.deleteDirectoryAtPath(getCodePushPath());
+        }
     }
 }

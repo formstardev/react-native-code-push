@@ -475,9 +475,20 @@ NSString * const UnzippedFolderName = @"unzipped";
 {
     NSError *error;
     NSMutableDictionary *info = [self getCurrentPackageInfo:&error];
-    
     if (error) {
         return;
+    }
+    
+    NSString *currentPackageFolderPath = [self getCurrentPackageFolderPath:&error];
+    if (error) {
+        return;
+    }
+    
+    NSError *deleteError;
+    [[NSFileManager defaultManager] removeItemAtPath:currentPackageFolderPath
+                                               error:&deleteError];
+    if (deleteError) {
+        NSLog(@"Error deleting current package contents at %@", currentPackageFolderPath);
     }
     
     [info setValue:info[@"previousPackage"] forKey:@"currentPackage"];
@@ -505,10 +516,12 @@ NSString * const UnzippedFolderName = @"unzipped";
     }
 }
 
-+ (void)clearUpdates
++ (void)clearTestUpdates
 {
-    [[NSFileManager defaultManager] removeItemAtPath:[self getCodePushPath] error:nil];
-    [[NSFileManager defaultManager] removeItemAtPath:[self getStatusFilePath] error:nil];
+    if ([CodePush isUsingTestConfiguration]) {
+        [[NSFileManager defaultManager] removeItemAtPath:[self getCodePushPath] error:nil];
+        [[NSFileManager defaultManager] removeItemAtPath:[self getStatusFilePath] error:nil];
+    }
 }
 
 @end
