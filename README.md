@@ -192,7 +192,7 @@ The simplest way to do this is to perform the following in your app's root compo
 1. Import the JavaScript module for CodePush:
 
     ```
-    var CodePush = require("react-native-code-push")
+    import CodePush from "react-native-code-push";
     ```
 
 2. Call the `sync` method from within the `componentDidMount` lifecycle event, to initiate a background update on each app start:
@@ -336,12 +336,15 @@ If you are using the `sync` function, and doing your update check on app start, 
 #### codePush.restartApp		
 		
 ```javascript		
-codePush.restartApp(): void;		
+codePush.restartApp(onlyIfUpdateIsPending: Boolean = false): void;		
 ```		
 		
-Immediately restarts the app. If there is an update pending, it will be presented to the end user and the rollback timer (if specified when installing the update) will begin. Otherwise, calling this method simply has the same behavior as the end user killing and restarting the process. This method is for advanced scenarios, and is primarily useful when the following conditions are true:		
+Immediately restarts the app. If a truthy value is provided to the `onlyIfUpdateIsPending` parameter, then the app will only restart if there is actually a pending update waiting to be applied.
+
+This method is for advanced scenarios, and is primarily useful when the following conditions are true:		
 		
-1. Your app is specifying an install mode value of `ON_NEXT_RESTART` or `ON_NEXT_RESUME` when calling the `sync` or `LocalPackage.install` methods. This has the effect of not applying your update until the app has been restarted (by either the end user or OS)	or resumed, and therefore, the update won't be immediately displayed to the end user 	.
+1. Your app is specifying an install mode value of `ON_NEXT_RESTART` or `ON_NEXT_RESUME` when calling the `sync` or `LocalPackage.install` methods. This has the effect of not applying your update until the app has been restarted (by either the end user or OS)	or resumed, and therefore, the update won't be immediately displayed to the end user.
+
 2. You have an app-specific user event (e.g. the end user navigated back to the app's home route) that allows you to apply the update in an unobtrusive way, and potentially gets the update in front of the end user sooner then waiting until the next restart or resume.		
 
 #### codePush.sync
@@ -556,6 +559,12 @@ Constructs the CodePush client runtime and includes methods for integrating Code
 
 - __CodePush(String deploymentKey, Activity mainActivity)__ - Creates a new instance of the CodePush runtime, that will be used to query the service for updates via the provided deployment key. The `mainActivity` parameter should always be set to `this` when configuring your `ReactInstanceManager` inside the `MainActivity` class.
 
+- __CodePush(String deploymentKey, Activity mainActivity, bool isDebugMode)__ - Equivalent to the other constructor, but allows you to specify whether you want the CodePush runtime to be in debug mode or not. When using this constructor, the `isDebugMode` parameter should always be set to `BuildConfig.DEBUG` in order to stay synchronized with your build type. When putting CodePush into debug mode, the following behaviors are enabled:
+
+    1. Old CodePush updates aren't deleted from storage whenever a new binary is deployed to the emulator/device. This behavior enables you to deploy new binaries, without bumping the version during development, and without continuously getting the same update every time your app calls `sync`.
+    
+    2. The local cache that the React Native runtime maintains in debug mode is deleted whenever a CodePush update is installed. This ensures that when the app is restarted after an update is applied, you will see the expected changes. As soon as [this PR](https://github.com/facebook/react-native/pull/4738) is merged, we won't need to do this anymore.
+    
 ##### Methods
 
 - __getBundleUrl(String bundleName)__ - Returns the path to the most recent version of your app's JS bundle file, using the specified resource name (e.g. `index.android.bundle`). This method has the same resolution behavior as the Objective-C equivalent described above.
