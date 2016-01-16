@@ -1,5 +1,4 @@
 export default {
-  deploymentKey: "myKey123",
   description: "Angry flappy birds",
   appVersion: "1.5.0",
   label: "2.4.0",

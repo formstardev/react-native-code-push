@@ -1,5 +1,4 @@
 #import "CodePush.h"
-#import <UIKit/UIKit.h>
 
 @implementation CodePushConfig {
     NSMutableDictionary *_configDictionary;
@@ -11,7 +10,6 @@ static NSString * const AppVersionConfigKey = @"appVersion";
 static NSString * const BuildVdersionConfigKey = @"buildVersion";
 static NSString * const DeploymentKeyConfigKey = @"deploymentKey";
 static NSString * const ServerURLConfigKey = @"serverUrl";
-static NSString * const ClientUniqueIDConfigKey = @"clientUniqueId";
 
 + (instancetype)current
 {
@@ -33,14 +31,6 @@ static NSString * const ClientUniqueIDConfigKey = @"clientUniqueId";
     NSString *deploymentKey = [infoDictionary objectForKey:@"CodePushDeploymentKey"];
     NSString *serverURL = [infoDictionary objectForKey:@"CodePushServerURL"];
     
-    NSUserDefaults* userDefaults = [NSUserDefaults standardUserDefaults];
-    NSString* clientUniqueId = [userDefaults stringForKey:ClientUniqueIDConfigKey];
-    if (clientUniqueId == nil) {
-        clientUniqueId = [[[UIDevice currentDevice] identifierForVendor] UUIDString];
-        [userDefaults setObject:clientUniqueId forKey:ClientUniqueIDConfigKey];
-        [userDefaults synchronize];
-    }
-    
     if (!serverURL) {
         serverURL = @"https://codepush.azurewebsites.net/";
     }
@@ -50,7 +40,6 @@ static NSString * const ClientUniqueIDConfigKey = @"clientUniqueId";
                             buildVersion,BuildVdersionConfigKey,
                             serverURL,ServerURLConfigKey,
                             deploymentKey,DeploymentKeyConfigKey,
-                            clientUniqueId,ClientUniqueIDConfigKey,
                             nil];
     
     return self;
@@ -79,11 +68,6 @@ static NSString * const ClientUniqueIDConfigKey = @"clientUniqueId";
 - (NSString *)serverURL
 {
     return [_configDictionary objectForKey:ServerURLConfigKey];
-}
-
-- (NSString *)clientUniqueId
-{
-    return [_configDictionary objectForKey:ClientUniqueIDConfigKey];
 }
 
 - (void)setDeploymentKey:(NSString *)deploymentKey

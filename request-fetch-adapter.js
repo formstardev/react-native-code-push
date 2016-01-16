@@ -16,7 +16,7 @@ module.exports = {
 
     try {
       const response = await fetch(url, {
-        method: getHttpMethodName(verb),
+        method: verb,
         headers: headers,
         body: body
       });
@@ -29,17 +29,3 @@ module.exports = {
     }
   }
 };
-
-function getHttpMethodName(verb) {
-  return [
-    "GET",
-    "HEAD",
-    "POST",
-    "PUT",
-    "DELETE",
-    "TRACE",
-    "OPTIONS",
-    "CONNECT",
-    "PATCH"
-  ][verb];
-}
