@@ -81,10 +81,6 @@ let CodePushDemoApp = React.createClass({
     }
   },
   
-  componentDidMount() {
-      CodePush.notifyApplicationReady();
-  },
-  
   getInitialState() {
     return { };
   },

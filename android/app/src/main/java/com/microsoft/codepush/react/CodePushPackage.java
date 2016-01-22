@@ -50,28 +50,20 @@ public class CodePushPackage {
         return CodePushUtils.appendPathComponent(getCodePushPath(), STATUS_FILE);
     }
 
-    public WritableMap getCurrentPackageInfo() {
+    public WritableMap getCurrentPackageInfo() throws IOException {
         String statusFilePath = getStatusFilePath();
         if (!CodePushUtils.fileAtPathExists(statusFilePath)) {
             return new WritableNativeMap();
         }
 
-        try {
-            return CodePushUtils.getWritableMapFromFile(statusFilePath);
-        } catch (IOException e) {
-            throw new CodePushUnknownException("Error getting current package info" , e);
-        }
+        return CodePushUtils.getWritableMapFromFile(statusFilePath);
     }
 
-    public void updateCurrentPackageInfo(ReadableMap packageInfo) {
-        try {
-            CodePushUtils.writeReadableMapToFile(packageInfo, getStatusFilePath());
-        } catch (IOException e) {
-            throw new CodePushUnknownException("Error updating current package info" , e);
-        }
+    public void updateCurrentPackageInfo(ReadableMap packageInfo) throws IOException {
+        CodePushUtils.writeReadableMapToFile(packageInfo, getStatusFilePath());
     }
 
-    public String getCurrentPackageFolderPath() {
+    public String getCurrentPackageFolderPath() throws IOException {
         WritableMap info = getCurrentPackageInfo();
         String packageHash = CodePushUtils.tryGetString(info, CURRENT_PACKAGE_KEY);
         if (packageHash == null) {
@@ -81,7 +73,7 @@ public class CodePushPackage {
         return getPackageFolderPath(packageHash);
     }
 
-    public String getCurrentPackageBundlePath() {
+    public String getCurrentPackageBundlePath() throws IOException {
         String packageFolder = getCurrentPackageFolderPath();
         if (packageFolder == null) {
             return null;
@@ -94,17 +86,17 @@ public class CodePushPackage {
         return CodePushUtils.appendPathComponent(getCodePushPath(), packageHash);
     }
 
-    public String getCurrentPackageHash() {
+    public String getCurrentPackageHash() throws IOException {
         WritableMap info = getCurrentPackageInfo();
         return CodePushUtils.tryGetString(info, CURRENT_PACKAGE_KEY);
     }
 
-    public String getPreviousPackageHash() {
+    public String getPreviousPackageHash() throws IOException {
         WritableMap info = getCurrentPackageInfo();
         return CodePushUtils.tryGetString(info, PREVIOUS_PACKAGE_KEY);
     }
 
-    public WritableMap getCurrentPackage() {
+    public WritableMap getCurrentPackage() throws IOException {
         String folderPath = getCurrentPackageFolderPath();
         if (folderPath == null) {
             return new WritableNativeMap();
@@ -119,7 +111,7 @@ public class CodePushPackage {
         }
     }
 
-    public WritableMap getPackage(String packageHash) {
+    public WritableMap getPackage(String packageHash) throws IOException {
         String folderPath = getPackageFolderPath(packageHash);
         String packageFilePath = CodePushUtils.appendPathComponent(folderPath, PACKAGE_FILE_NAME);
         try {
@@ -193,7 +185,7 @@ public class CodePushPackage {
         updateCurrentPackageInfo(info);
     }
 
-    public void rollbackPackage() {
+    public void rollbackPackage() throws IOException {
         WritableMap info = getCurrentPackageInfo();
         String currentPackageFolderPath = getCurrentPackageFolderPath();
         CodePushUtils.deleteDirectoryAtPath(currentPackageFolderPath);
