@@ -1,8 +1,8 @@
 module.exports = {
-  async request(verb, url, requestBody, callback) {
-    if (typeof requestBody === "function") {
-      callback = requestBody;
-      requestBody = null;
+  async request(verb, url, body, callback) {
+    if (typeof body === "function") {
+      callback = body;
+      body = null;
     }
 
     var headers = {
@@ -10,15 +10,15 @@ module.exports = {
       "Content-Type": "application/json"
     };
 
-    if (requestBody && typeof requestBody === "object") {
-      requestBody = JSON.stringify(requestBody);
+    if (body && typeof body === "object") {
+      body = JSON.stringify(body);
     }
 
     try {
       const response = await fetch(url, {
-        method: getHttpMethodName(verb),
+        method: verb,
         headers: headers,
-        body: requestBody
+        body: body
       });
         
       const statusCode = response.status;
@@ -29,19 +29,3 @@ module.exports = {
     }
   }
 };
-
-function getHttpMethodName(verb) {
-  // Note: This should stay in sync with the enum definition in
-  // https://github.com/Microsoft/code-push/blob/master/sdk/script/acquisition-sdk.ts#L6
-  return [
-    "GET",
-    "HEAD",
-    "POST",
-    "PUT",
-    "DELETE",
-    "TRACE",
-    "OPTIONS",
-    "CONNECT",
-    "PATCH"
-  ][verb];
-}

@@ -13,17 +13,10 @@
 
 RCT_EXPORT_MODULE()
 
-static BOOL didRollback = NO;
-static BOOL isRunningBinaryVersion = NO;
 static BOOL testConfigurationFlag = NO;
-
-// These constants represent valid deployment statuses
-static NSString *const DeploymentFailed = @"DeploymentFailed";
-static NSString *const DeploymentSucceeded = @"DeploymentSucceeded";
 
 // These keys represent the names we use to store data in NSUserDefaults
 static NSString *const FailedUpdatesKey = @"CODE_PUSH_FAILED_UPDATES";
-static NSString *const LastDeploymentReportKey = @"CODE_PUSH_LAST_DEPLOYMENT_REPORT";
 static NSString *const PendingUpdateKey = @"CODE_PUSH_PENDING_UPDATE";
 
 // These keys are already "namespaced" by the PendingUpdateKey, so
@@ -33,8 +26,6 @@ static NSString *const PendingUpdateIsLoadingKey = @"isLoading";
 
 // These keys are used to inspect/augment the metadata
 // that is associated with an update's package.
-static NSString *const DeploymentKeyKey = @"deploymentKey";
-static NSString *const LabelKey = @"label";
 static NSString *const PackageHashKey = @"packageHash";
 static NSString *const PackageIsPendingKey = @"isPending";
 
@@ -63,7 +54,6 @@ static NSString *const PackageIsPendingKey = @"isPending";
     
     if (error || !packageFile) {
         NSLog(logMessageFormat, binaryJsBundleUrl);
-        isRunningBinaryVersion = YES;
         return binaryJsBundleUrl;
     }
     
@@ -75,17 +65,15 @@ static NSString *const PackageIsPendingKey = @"isPending";
     NSDictionary *currentPackageMetadata = [CodePushPackage getCurrentPackage:&error];
     if (error || !currentPackageMetadata) {
         NSLog(logMessageFormat, binaryJsBundleUrl);
-        isRunningBinaryVersion = YES;
         return binaryJsBundleUrl;
     }
     
     NSString *packageAppVersion = [currentPackageMetadata objectForKey:@"appVersion"];
     
-    if ([binaryDate compare:packageDate] == NSOrderedAscending && ([CodePush isUsingTestConfiguration] ||[binaryAppVersion isEqualToString:packageAppVersion])) {
+    if ([binaryDate compare:packageDate] == NSOrderedAscending && [binaryAppVersion isEqualToString:packageAppVersion]) {
         // Return package file because it is newer than the app store binary's JS bundle
         NSURL *packageUrl = [[NSURL alloc] initFileURLWithPath:packageFile];
         NSLog(logMessageFormat, packageUrl);
-        isRunningBinaryVersion = NO;
         return packageUrl;
     } else {
 #ifndef DEBUG
@@ -93,7 +81,6 @@ static NSString *const PackageIsPendingKey = @"isPending";
 #endif
 
         NSLog(logMessageFormat, binaryJsBundleUrl);
-        isRunningBinaryVersion = YES;
         return binaryJsBundleUrl;
     }
 }
@@ -161,19 +148,6 @@ static NSString *const PackageIsPendingKey = @"isPending";
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
-- (NSString *)getPackageStatusReportIdentifier:(NSDictionary *)package
-{
-    // Because deploymentKeys can be dynamically switched, we use a
-    // combination of the deploymentKey and label as the packageIdentifier.
-    NSString *deploymentKey = [package objectForKey:DeploymentKeyKey];
-    NSString *label = [package objectForKey:LabelKey];
-    if (deploymentKey && label) {
-        return [[deploymentKey stringByAppendingString:@":"] stringByAppendingString:label];
-    } else {
-        return nil;
-    }
-}
-
 - (instancetype)init
 {
     self = [super init];
@@ -195,7 +169,6 @@ static NSString *const PackageIsPendingKey = @"isPending";
     NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
     NSDictionary *pendingUpdate = [preferences objectForKey:PendingUpdateKey];
     if (pendingUpdate) {
-        didRollback = NO;
         _isFirstRunAfterUpdate = YES;
         BOOL updateIsLoading = [pendingUpdate[PendingUpdateIsLoadingKey] boolValue];
         if (updateIsLoading) {
@@ -203,7 +176,6 @@ static NSString *const PackageIsPendingKey = @"isPending";
             // Therefore, deduce that it is a broken update and rollback.
             NSLog(@"Update did not finish loading the last time, rolling back to a previous version.");
             [self rollbackPackage];
-            didRollback = YES;
         } else {
             // Mark that we tried to initialize the new update, so that if it crashes,
             // we will know that we need to rollback when the app next starts.
@@ -211,13 +183,6 @@ static NSString *const PackageIsPendingKey = @"isPending";
                           isLoading:YES];
         }
     }
-}
-
-- (BOOL)isDeploymentStatusNotYetReported:(NSString *)appVersionOrPackageIdentifier
-{
-    NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
-    NSString *sentStatusReportIdentifier = [preferences objectForKey:LastDeploymentReportKey];
-    return sentStatusReportIdentifier == nil || ![sentStatusReportIdentifier isEqualToString:appVersionOrPackageIdentifier];
 }
 
 /*
@@ -228,25 +193,7 @@ static NSString *const PackageIsPendingKey = @"isPending";
 {
     NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
     NSMutableArray *failedUpdates = [preferences objectForKey:FailedUpdatesKey];
-    if (failedUpdates == nil || packageHash == nil) {
-        return NO;
-    } else {
-        for (NSDictionary *failedPackage in failedUpdates)
-        {
-            // Type check is needed for backwards compatibility, where we used to just store
-            // the failed package hash instead of the metadata. This only impacts "dev"
-            // scenarios, since in production we clear out old information whenever a new
-            // binary is applied.
-            if ([failedPackage isKindOfClass:[NSDictionary class]]) {
-                NSString *failedPackageHash = [failedPackage objectForKey:PackageHashKey];
-                if ([packageHash isEqualToString:failedPackageHash]) {
-                    return YES;
-                }
-            }
-        }
-        
-        return NO;
-    }
+    return (failedUpdates != nil && [failedUpdates containsObject:packageHash]);
 }
 
 /*
@@ -283,18 +230,11 @@ static NSString *const PackageIsPendingKey = @"isPending";
         // file (since Chrome wouldn't support it). Otherwise, update
         // the current bundle URL to point at the latest update
         if ([CodePush isUsingTestConfiguration] || ![_bridge.bundleURL.scheme hasPrefix:@"http"]) {
-            _bridge.bundleURL = [CodePush bundleURL];
+            [_bridge setValue:[CodePush bundleURL] forKey:@"bundleURL"];
         }
         
         [_bridge reload];
     });
-}
-
-- (void)recordDeploymentStatusReported:(NSString *)appVersionOrPackageIdentifier
-{
-    NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
-    [preferences setValue:LastDeploymentReportKey forKey:appVersionOrPackageIdentifier];
-    [preferences synchronize];
 }
 
 /*
@@ -307,10 +247,10 @@ static NSString *const PackageIsPendingKey = @"isPending";
 - (void)rollbackPackage
 {
     NSError *error;
-    NSDictionary *failedPackage = [CodePushPackage getCurrentPackage:&error];
+    NSString *packageHash = [CodePushPackage getCurrentPackageHash:&error];
     
-    // Write the current package's metadata to the "failed list"
-    [self saveFailedUpdate:failedPackage];
+    // Write the current package's hash to the "failed list"
+    [self saveFailedUpdate:packageHash];
     
     // Rollback to the previous version and de-register the new update
     [CodePushPackage rollbackPackage];
@@ -323,7 +263,7 @@ static NSString *const PackageIsPendingKey = @"isPending";
  * to store its hash so that it can be ignored on future
  * attempts to check the server for an update.
  */
-- (void)saveFailedUpdate:(NSDictionary *)failedPackage
+- (void)saveFailedUpdate:(NSString *)packageHash
 {
     NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
     NSMutableArray *failedUpdates = [preferences objectForKey:FailedUpdatesKey];
@@ -335,7 +275,7 @@ static NSString *const PackageIsPendingKey = @"isPending";
         failedUpdates = [failedUpdates mutableCopy];
     }
     
-    [failedUpdates addObject:failedPackage];
+    [failedUpdates addObject:packageHash];
     [preferences setObject:failedUpdates forKey:FailedUpdatesKey];
     [preferences synchronize];
 }
@@ -524,53 +464,6 @@ RCT_EXPORT_METHOD(notifyApplicationReady:(RCTPromiseResolveBlock)resolve
                                 rejecter:(RCTPromiseRejectBlock)reject)
 {
     [CodePush removePendingUpdate];
-    resolve([NSNull null]);
-}
-
-/*
- * This method is checks if a new status update exists (new version was installed, 
- * or an update failed) and return its details (version label, status).
- */
-RCT_EXPORT_METHOD(getNewStatusReport:(RCTPromiseResolveBlock)resolve
-                            rejecter:(RCTPromiseRejectBlock)reject)
-{
-    if (didRollback) {
-        // Check if there was a rollback that was not yet reported
-        NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
-        NSMutableArray *failedUpdates = [preferences objectForKey:FailedUpdatesKey];
-        if (failedUpdates) {
-            NSDictionary *lastFailedPackage = [failedUpdates lastObject];
-            if (lastFailedPackage) {
-                NSString *lastFailedPackageIdentifier = [self getPackageStatusReportIdentifier:lastFailedPackage];
-                if (lastFailedPackageIdentifier && [self isDeploymentStatusNotYetReported:lastFailedPackageIdentifier]) {
-                    [self recordDeploymentStatusReported:lastFailedPackageIdentifier];
-                    resolve(@{ @"package": lastFailedPackage, @"status": DeploymentFailed });
-                    return;
-                }
-            }
-        }
-    } else if (_isFirstRunAfterUpdate) {
-        // Check if the current CodePush package has been reported
-        NSError *error;
-        NSDictionary *currentPackage = [CodePushPackage getCurrentPackage:&error];
-        if (!error && currentPackage) {
-            NSString *currentPackageIdentifier = [self getPackageStatusReportIdentifier:currentPackage];
-            if (currentPackageIdentifier && [self isDeploymentStatusNotYetReported:currentPackageIdentifier]) {
-                [self recordDeploymentStatusReported:currentPackageIdentifier];
-                resolve(@{ @"package": currentPackage, @"status": DeploymentSucceeded });
-                return;
-            }
-        }
-    } else if (isRunningBinaryVersion || [_bridge.bundleURL.scheme hasPrefix:@"http"]) {
-        // Check if the current appVersion has been reported.
-        NSString *appVersion = [[CodePushConfig current] appVersion];
-        if ([self isDeploymentStatusNotYetReported:appVersion]) {
-            [self recordDeploymentStatusReported:appVersion];
-            resolve(@{ @"appVersion": appVersion });
-            return;
-        }
-    }
-    
     resolve([NSNull null]);
 }
 
