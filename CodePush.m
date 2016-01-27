@@ -13,8 +13,6 @@
 
 RCT_EXPORT_MODULE()
 
-#pragma mark - Private constants
-
 static BOOL needToReportRollback = NO;
 static BOOL isRunningBinaryVersion = NO;
 static BOOL testConfigurationFlag = NO;
@@ -40,8 +38,9 @@ static NSString *const LabelKey = @"label";
 static NSString *const PackageHashKey = @"packageHash";
 static NSString *const PackageIsPendingKey = @"isPending";
 
-#pragma mark - Public Obj-C API
+@synthesize bridge = _bridge;
 
+// Public Obj-C API (see header for method comments)
 + (NSURL *)bundleURL
 {
     return [self bundleURLForResource:@"main"];
@@ -92,7 +91,7 @@ static NSString *const PackageIsPendingKey = @"isPending";
 #ifndef DEBUG
         [CodePush clearUpdates];
 #endif
-        
+
         NSLog(logMessageFormat, binaryJsBundleUrl);
         isRunningBinaryVersion = YES;
         return binaryJsBundleUrl;
@@ -114,12 +113,7 @@ static NSString *const PackageIsPendingKey = @"isPending";
     return testConfigurationFlag;
 }
 
-+ (void)setDeploymentKey:(NSString *)deploymentKey
-{
-    [CodePushConfig current].deploymentKey = deploymentKey;
-}
-
-/*
+/* 
  * This is used to enable an environment in which tests can be run.
  * Specifically, it flips a boolean flag that causes bundles to be
  * saved to a test folder and enables the ability to modify
@@ -140,9 +134,8 @@ static NSString *const PackageIsPendingKey = @"isPending";
     [self removeFailedUpdates];
 }
 
-#pragma mark - Private API methods
 
-@synthesize bridge = _bridge;
+// Private API methods
 
 /*
  * This method is used by the React Native bridge to allow
@@ -154,10 +147,10 @@ static NSString *const PackageIsPendingKey = @"isPending";
 {
     // Export the values of the CodePushInstallMode enum
     // so that the script-side can easily stay in sync
-    return @{
-             @"codePushInstallModeOnNextRestart":@(CodePushInstallModeOnNextRestart),
-             @"codePushInstallModeImmediate": @(CodePushInstallModeImmediate),
-             @"codePushInstallModeOnNextResume": @(CodePushInstallModeOnNextResume)
+    return @{ 
+              @"codePushInstallModeOnNextRestart":@(CodePushInstallModeOnNextRestart),
+              @"codePushInstallModeImmediate": @(CodePushInstallModeImmediate),
+              @"codePushInstallModeOnNextResume": @(CodePushInstallModeOnNextResume)
             };
 };
 
@@ -166,6 +159,11 @@ static NSString *const PackageIsPendingKey = @"isPending";
     // Ensure the global resume handler is cleared, so that
     // this object isn't kept alive unnecessarily
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (NSString *)getDeploymentKeyFromStatusReportIdentifier:(NSString *)statusReportIdentifier
+{
+    return [[statusReportIdentifier componentsSeparatedByString:@":"] firstObject];
 }
 
 - (NSString *)getPackageStatusReportIdentifier:(NSDictionary *)package
@@ -179,6 +177,18 @@ static NSString *const PackageIsPendingKey = @"isPending";
     } else {
         return nil;
     }
+}
+
+- (NSString *)getPreviousStatusReportIdentifier
+{
+    NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
+    NSString *sentStatusReportIdentifier = [preferences objectForKey:LastDeploymentReportKey];
+    return sentStatusReportIdentifier;
+}
+
+- (NSString *)getVersionLabelFromStatusReportIdentifier:(NSString *)statusReportIdentifier
+{
+    return [[statusReportIdentifier componentsSeparatedByString:@":"] lastObject];
 }
 
 - (instancetype)init
@@ -219,13 +229,6 @@ static NSString *const PackageIsPendingKey = @"isPending";
     }
 }
 
-- (BOOL)isDeploymentStatusNotYetReported:(NSString *)appVersionOrPackageIdentifier
-{
-    NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
-    NSString *sentStatusReportIdentifier = [preferences objectForKey:LastDeploymentReportKey];
-    return sentStatusReportIdentifier == nil || ![sentStatusReportIdentifier isEqualToString:appVersionOrPackageIdentifier];
-}
-
 /*
  * This method checks to see whether a specific package hash
  * has previously failed installation.
@@ -264,7 +267,7 @@ static NSString *const PackageIsPendingKey = @"isPending";
 {
     NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
     NSDictionary *pendingUpdate = [preferences objectForKey:PendingUpdateKey];
-    
+
     // If there is a pending update whose "state" isn't loading, then we consider it "pending".
     // Additionally, if a specific hash was provided, we ensure it matches that of the pending update.
     BOOL updateIsPending = pendingUpdate &&
@@ -272,6 +275,11 @@ static NSString *const PackageIsPendingKey = @"isPending";
                            (!packageHash || [pendingUpdate[PendingUpdateHashKey] isEqualToString:packageHash]);
     
     return updateIsPending;
+}
+
+- (BOOL)isStatusReportIdentifierCodePushLabel:(NSString *)statusReportIdentifier
+{
+    return statusReportIdentifier != nil && [statusReportIdentifier containsString:@":"];
 }
 
 /*
@@ -387,7 +395,7 @@ static NSString *const PackageIsPendingKey = @"isPending";
     [preferences synchronize];
 }
 
-#pragma mark - JavaScript-exported module methods
+// JavaScript-exported module methods
 
 /*
  * This is native-side of the RemotePackage.download method
@@ -411,11 +419,11 @@ RCT_EXPORT_METHOD(downloadUpdate:(NSDictionary*)updatePackage
         doneCallback:^{
             NSError *err;
             NSDictionary *newPackage = [CodePushPackage getPackage:updatePackage[PackageHashKey] error:&err];
-            
+                
             if (err) {
                 return reject(err);
             }
-            
+                
             resolve(newPackage);
         }
         // The download failed
@@ -454,7 +462,7 @@ RCT_EXPORT_METHOD(getCurrentPackage:(RCTPromiseResolveBlock)resolve
         // the script-side doesn't need to immediately call back into native to populate it.
         BOOL isPendingUpdate = [self isPendingUpdate:[package objectForKey:PackageHashKey]];
         [package setObject:@(isPendingUpdate) forKey:PackageIsPendingKey];
-        
+
         resolve(package);
     });
 }
@@ -534,7 +542,7 @@ RCT_EXPORT_METHOD(notifyApplicationReady:(RCTPromiseResolveBlock)resolve
 }
 
 /*
- * This method is checks if a new status update exists (new version was installed,
+ * This method is checks if a new status update exists (new version was installed, 
  * or an update failed) and return its details (version label, status).
  */
 RCT_EXPORT_METHOD(getNewStatusReport:(RCTPromiseResolveBlock)resolve
@@ -549,9 +557,13 @@ RCT_EXPORT_METHOD(getNewStatusReport:(RCTPromiseResolveBlock)resolve
             NSDictionary *lastFailedPackage = [failedUpdates lastObject];
             if (lastFailedPackage) {
                 NSString *lastFailedPackageIdentifier = [self getPackageStatusReportIdentifier:lastFailedPackage];
-                if (lastFailedPackageIdentifier && [self isDeploymentStatusNotYetReported:lastFailedPackageIdentifier]) {
+                NSString *previousStatusReportIdentifier = [self getPreviousStatusReportIdentifier];
+                if (lastFailedPackageIdentifier && (previousStatusReportIdentifier == nil || ![previousStatusReportIdentifier isEqualToString:lastFailedPackageIdentifier])) {
                     [self recordDeploymentStatusReported:lastFailedPackageIdentifier];
-                    resolve(@{ @"package": lastFailedPackage, @"status": DeploymentFailed });
+                    resolve(@{
+                              @"package": lastFailedPackage,
+                              @"status": DeploymentFailed
+                              });
                     return;
                 }
             }
@@ -562,18 +574,63 @@ RCT_EXPORT_METHOD(getNewStatusReport:(RCTPromiseResolveBlock)resolve
         NSDictionary *currentPackage = [CodePushPackage getCurrentPackage:&error];
         if (!error && currentPackage) {
             NSString *currentPackageIdentifier = [self getPackageStatusReportIdentifier:currentPackage];
-            if (currentPackageIdentifier && [self isDeploymentStatusNotYetReported:currentPackageIdentifier]) {
-                [self recordDeploymentStatusReported:currentPackageIdentifier];
-                resolve(@{ @"package": currentPackage, @"status": DeploymentSucceeded });
-                return;
+            NSString *previousStatusReportIdentifier = [self getPreviousStatusReportIdentifier];
+            if (currentPackageIdentifier) {
+                if (previousStatusReportIdentifier == nil) {
+                    [self recordDeploymentStatusReported:currentPackageIdentifier];
+                    resolve(@{
+                              @"package": currentPackage,
+                              @"status": DeploymentSucceeded
+                              });
+                    return;
+                } else if (![previousStatusReportIdentifier isEqualToString:currentPackageIdentifier]) {
+                    [self recordDeploymentStatusReported:currentPackageIdentifier];
+                    if ([self isStatusReportIdentifierCodePushLabel:previousStatusReportIdentifier]) {
+                        NSString *fromDeploymentKey = [self getDeploymentKeyFromStatusReportIdentifier:previousStatusReportIdentifier];
+                        NSString *fromLabel = [self getVersionLabelFromStatusReportIdentifier:previousStatusReportIdentifier];
+                        resolve(@{
+                                  @"package": currentPackage,
+                                  @"status": DeploymentSucceeded,
+                                  @"fromDeploymentKey": fromDeploymentKey,
+                                  @"fromLabelOrAppVersion": fromLabel
+                                  });
+                    } else {
+                        // Previous status report was with a binary app version.
+                        resolve(@{
+                                  @"package": currentPackage,
+                                  @"status": DeploymentSucceeded,
+                                  @"fromLabelOrAppVersion": previousStatusReportIdentifier
+                                  });
+                    }
+                    return;
+                }
             }
         }
     } else if (isRunningBinaryVersion || [_bridge.bundleURL.scheme hasPrefix:@"http"]) {
         // Check if the current appVersion has been reported.
         NSString *appVersion = [[CodePushConfig current] appVersion];
-        if ([self isDeploymentStatusNotYetReported:appVersion]) {
+        NSString *previousStatusReportIdentifier = [self getPreviousStatusReportIdentifier];
+        if (previousStatusReportIdentifier == nil) {
             [self recordDeploymentStatusReported:appVersion];
             resolve(@{ @"appVersion": appVersion });
+            return;
+        } else if (![previousStatusReportIdentifier isEqualToString:appVersion]) {
+            [self recordDeploymentStatusReported:appVersion];
+            if ([self isStatusReportIdentifierCodePushLabel:previousStatusReportIdentifier]) {
+                NSString *fromDeploymentKey = [self getDeploymentKeyFromStatusReportIdentifier:previousStatusReportIdentifier];
+                NSString *fromLabel = [self getVersionLabelFromStatusReportIdentifier:previousStatusReportIdentifier];
+                resolve(@{
+                          @"appVersion": appVersion,
+                          @"fromDeploymentKey": fromDeploymentKey,
+                          @"fromLabelOrAppVersion": fromLabel
+                          });
+            } else {
+                // Previous status report was with a binary app version.
+                resolve(@{
+                          @"appVersion": appVersion,
+                          @"fromLabelOrAppVersion": previousStatusReportIdentifier
+                          });
+            }
             return;
         }
     }
@@ -596,7 +653,7 @@ RCT_EXPORT_METHOD(restartApp:(BOOL)onlyIfUpdateIsPending)
 /*
  * This method is the native side of the CodePush.downloadAndReplaceCurrentBundle()
  * method, which replaces the current bundle with the one downloaded from
- * removeBundleUrl. It is only to be used during tests and no-ops if the test
+ * removeBundleUrl. It is only to be used during tests and no-ops if the test 
  * configuration flag is not set.
  */
 RCT_EXPORT_METHOD(downloadAndReplaceCurrentBundle:(NSString *)remoteBundleUrl)
