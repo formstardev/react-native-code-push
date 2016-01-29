@@ -13,8 +13,6 @@
 
 RCT_EXPORT_MODULE()
 
-#pragma mark - Private constants
-
 static BOOL needToReportRollback = NO;
 static BOOL isRunningBinaryVersion = NO;
 static BOOL testConfigurationFlag = NO;
@@ -37,8 +35,9 @@ static NSString *const PendingUpdateIsLoadingKey = @"isLoading";
 static NSString *const PackageHashKey = @"packageHash";
 static NSString *const PackageIsPendingKey = @"isPending";
 
-#pragma mark - Public Obj-C API
+@synthesize bridge = _bridge;
 
+// Public Obj-C API (see header for method comments)
 + (NSURL *)bundleURL
 {
     return [self bundleURLForResource:@"main"];
@@ -89,7 +88,7 @@ static NSString *const PackageIsPendingKey = @"isPending";
 #ifndef DEBUG
         [CodePush clearUpdates];
 #endif
-        
+
         NSLog(logMessageFormat, binaryJsBundleUrl);
         isRunningBinaryVersion = YES;
         return binaryJsBundleUrl;
@@ -111,12 +110,7 @@ static NSString *const PackageIsPendingKey = @"isPending";
     return testConfigurationFlag;
 }
 
-+ (void)setDeploymentKey:(NSString *)deploymentKey
-{
-    [CodePushConfig current].deploymentKey = deploymentKey;
-}
-
-/*
+/* 
  * This is used to enable an environment in which tests can be run.
  * Specifically, it flips a boolean flag that causes bundles to be
  * saved to a test folder and enables the ability to modify
@@ -137,9 +131,8 @@ static NSString *const PackageIsPendingKey = @"isPending";
     [self removeFailedUpdates];
 }
 
-#pragma mark - Private API methods
 
-@synthesize bridge = _bridge;
+// Private API methods
 
 /*
  * This method is used by the React Native bridge to allow
@@ -151,10 +144,10 @@ static NSString *const PackageIsPendingKey = @"isPending";
 {
     // Export the values of the CodePushInstallMode enum
     // so that the script-side can easily stay in sync
-    return @{
-             @"codePushInstallModeOnNextRestart":@(CodePushInstallModeOnNextRestart),
-             @"codePushInstallModeImmediate": @(CodePushInstallModeImmediate),
-             @"codePushInstallModeOnNextResume": @(CodePushInstallModeOnNextResume)
+    return @{ 
+              @"codePushInstallModeOnNextRestart":@(CodePushInstallModeOnNextRestart),
+              @"codePushInstallModeImmediate": @(CodePushInstallModeImmediate),
+              @"codePushInstallModeOnNextResume": @(CodePushInstallModeOnNextResume)
             };
 };
 
@@ -241,7 +234,7 @@ static NSString *const PackageIsPendingKey = @"isPending";
 {
     NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
     NSDictionary *pendingUpdate = [preferences objectForKey:PendingUpdateKey];
-    
+
     // If there is a pending update whose "state" isn't loading, then we consider it "pending".
     // Additionally, if a specific hash was provided, we ensure it matches that of the pending update.
     BOOL updateIsPending = pendingUpdate &&
@@ -357,7 +350,7 @@ static NSString *const PackageIsPendingKey = @"isPending";
     [preferences synchronize];
 }
 
-#pragma mark - JavaScript-exported module methods
+// JavaScript-exported module methods
 
 /*
  * This is native-side of the RemotePackage.download method
@@ -366,32 +359,34 @@ RCT_EXPORT_METHOD(downloadUpdate:(NSDictionary*)updatePackage
                         resolver:(RCTPromiseResolveBlock)resolve
                         rejecter:(RCTPromiseRejectBlock)reject)
 {
-    [CodePushPackage downloadPackage:updatePackage
-        // The download is progressing forward
-        progressCallback:^(long long expectedContentLength, long long receivedContentLength) {
-            // Notify the script-side about the progress
-            [self.bridge.eventDispatcher
-                sendDeviceEventWithName:@"CodePushDownloadProgress"
-                body:@{
-                        @"totalBytes":[NSNumber numberWithLongLong:expectedContentLength],
-                        @"receivedBytes":[NSNumber numberWithLongLong:receivedContentLength]
-                      }];
-        }
-        // The download completed
-        doneCallback:^{
-            NSError *err;
-            NSDictionary *newPackage = [CodePushPackage getPackage:updatePackage[PackageHashKey] error:&err];
-            
-            if (err) {
-                return reject(err);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [CodePushPackage downloadPackage:updatePackage
+            // The download is progressing forward
+            progressCallback:^(long long expectedContentLength, long long receivedContentLength) {
+                // Notify the script-side about the progress
+                [self.bridge.eventDispatcher
+                    sendDeviceEventWithName:@"CodePushDownloadProgress"
+                    body:@{
+                            @"totalBytes":[NSNumber numberWithLongLong:expectedContentLength],
+                            @"receivedBytes":[NSNumber numberWithLongLong:receivedContentLength]
+                          }];
             }
-            
-            resolve(newPackage);
-        }
-        // The download failed
-        failCallback:^(NSError *err) {
-            reject(err);
-        }];
+            // The download completed
+            doneCallback:^{
+                NSError *err;
+                NSDictionary *newPackage = [CodePushPackage getPackage:updatePackage[PackageHashKey] error:&err];
+                    
+                if (err) {
+                    return reject(err);
+                }
+                    
+                resolve(newPackage);
+            }
+            // The download failed
+            failCallback:^(NSError *err) {
+                reject(err);
+            }];
+    });
 }
 
 /*
@@ -424,7 +419,7 @@ RCT_EXPORT_METHOD(getCurrentPackage:(RCTPromiseResolveBlock)resolve
         // the script-side doesn't need to immediately call back into native to populate it.
         BOOL isPendingUpdate = [self isPendingUpdate:[package objectForKey:PackageHashKey]];
         [package setObject:@(isPendingUpdate) forKey:PackageIsPendingKey];
-        
+
         resolve(package);
     });
 }
@@ -556,7 +551,7 @@ RCT_EXPORT_METHOD(restartApp:(BOOL)onlyIfUpdateIsPending)
 /*
  * This method is the native side of the CodePush.downloadAndReplaceCurrentBundle()
  * method, which replaces the current bundle with the one downloaded from
- * removeBundleUrl. It is only to be used during tests and no-ops if the test
+ * removeBundleUrl. It is only to be used during tests and no-ops if the test 
  * configuration flag is not set.
  */
 RCT_EXPORT_METHOD(downloadAndReplaceCurrentBundle:(NSString *)remoteBundleUrl)
