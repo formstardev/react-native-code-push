@@ -425,50 +425,41 @@ public class CodePush {
         }
 
         @ReactMethod
-        public void getNewStatusReport(final Promise promise) {
-
-            AsyncTask asyncTask = new AsyncTask() {
-                @Override
-                protected Void doInBackground(Object... params) {
-                    if (needToReportRollback) {
-                        needToReportRollback = false;
-                        JSONArray failedUpdates = getFailedUpdates();
-                        if (failedUpdates != null && failedUpdates.length() > 0) {
-                            try {
-                                JSONObject lastFailedPackageJSON = failedUpdates.getJSONObject(failedUpdates.length() - 1);
-                                WritableMap lastFailedPackage = CodePushUtils.convertJsonObjectToWriteable(lastFailedPackageJSON);
-                                WritableMap failedStatusReport = codePushTelemetryManager.getRollbackReport(lastFailedPackage);
-                                if (failedStatusReport != null) {
-                                    promise.resolve(failedStatusReport);
-                                    return null;
-                                }
-                            } catch (JSONException e) {
-                                throw new CodePushUnknownException("Unable to read failed updates information stored in SharedPreferences.", e);
-                            }
+        public void getNewStatusReport(Promise promise) {
+            if (needToReportRollback) {
+                needToReportRollback = false;
+                JSONArray failedUpdates = getFailedUpdates();
+                if (failedUpdates != null && failedUpdates.length() > 0) {
+                    try {
+                        JSONObject lastFailedPackageJSON = failedUpdates.getJSONObject(failedUpdates.length() - 1);
+                        WritableMap lastFailedPackage = CodePushUtils.convertJsonObjectToWriteable(lastFailedPackageJSON);
+                        WritableMap failedStatusReport = codePushTelemetryManager.getRollbackReport(lastFailedPackage);
+                        if (failedStatusReport != null) {
+                            promise.resolve(failedStatusReport);
+                            return;
                         }
-                    } else if (didUpdate) {
-                        WritableMap currentPackage = codePushPackage.getCurrentPackage();
-                        if (currentPackage != null) {
-                            WritableMap newPackageStatusReport = codePushTelemetryManager.getUpdateReport(currentPackage);
-                            if (newPackageStatusReport != null) {
-                                promise.resolve(newPackageStatusReport);
-                                return null;
-                            }
-                        }
-                    } else if (isRunningBinaryVersion) {
-                        WritableMap newAppVersionStatusReport = codePushTelemetryManager.getBinaryUpdateReport(appVersion);
-                        if (newAppVersionStatusReport != null) {
-                            promise.resolve(newAppVersionStatusReport);
-                            return null;
-                        }
+                    } catch (JSONException e) {
+                        throw new CodePushUnknownException("Unable to read failed updates information stored in SharedPreferences.", e);
                     }
-
-                    promise.resolve("");
-                    return null;
                 }
-            };
+            } else if (didUpdate) {
+                WritableMap currentPackage = codePushPackage.getCurrentPackage();
+                if (currentPackage != null) {
+                    WritableMap newPackageStatusReport = codePushTelemetryManager.getUpdateReport(currentPackage);
+                    if (newPackageStatusReport != null) {
+                        promise.resolve(newPackageStatusReport);
+                        return;
+                    }
+                }
+            } else if (isRunningBinaryVersion) {
+                WritableMap newAppVersionStatusReport = codePushTelemetryManager.getBinaryUpdateReport(appVersion);
+                if (newAppVersionStatusReport != null) {
+                    promise.resolve(newAppVersionStatusReport);
+                    return;
+                }
+            }
 
-            asyncTask.execute();
+            promise.resolve("");
         }
 
         @ReactMethod
