@@ -2,6 +2,7 @@ package com.microsoft.codepush.react;
 
 import android.content.Context;
 
+import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableNativeMap;
@@ -156,6 +157,7 @@ public class CodePushPackage {
 
         String newPackageFolderPath = getPackageFolderPath(CodePushUtils.tryGetString(updatePackage, PACKAGE_HASH_KEY));
         String downloadUrlString = CodePushUtils.tryGetString(updatePackage, DOWNLOAD_URL_KEY);
+
         URL downloadUrl = null;
         HttpURLConnection connection = null;
         BufferedInputStream bin = null;
@@ -218,7 +220,7 @@ public class CodePushPackage {
             // Unzip the downloaded file and then delete the zip
             String unzippedFolderPath = getUnzippedFolderPath();
             FileUtils.unzipFile(downloadFile, unzippedFolderPath);
-            FileUtils.deleteFileOrFolderSilently(downloadFile);
+            FileUtils.deleteFileSilently(downloadFile);
 
             // Merge contents with current update based on the manifest
             String diffManifestFilePath = CodePushUtils.appendPathComponent(unzippedFolderPath,
@@ -246,12 +248,13 @@ public class CodePushPackage {
                             RELATIVE_BUNDLE_PATH_KEY + " to value " + relativeBundlePath +
                             " in update package.", e);
                 }
-
+                
                 updatePackage = CodePushUtils.convertJsonObjectToWriteable(updatePackageJSON);
             }
         } else {
-            // File is a jsbundle, move it to a folder with the packageHash as its name
-            FileUtils.moveFile(downloadFile, newPackageFolderPath, UPDATE_BUNDLE_FILE_NAME);
+            // File is a jsBundle, move it to a folder with the packageHash as its name
+            File updateBundleFile = new File(newPackageFolderPath, UPDATE_BUNDLE_FILE_NAME);
+            downloadFile.renameTo(updateBundleFile);
         }
 
         // Save metadata to the folder.

@@ -15,7 +15,7 @@ public class CodePushUpdateUtils {
         for (int i = 0; i < deletedFiles.size(); i++) {
             String fileNameToDelete = deletedFiles.getString(i);
             File fileToDelete = new File(newPackageFolderPath, fileNameToDelete);
-            FileUtils.deleteFileOrFolderSilently(fileToDelete);
+            FileUtils.deleteFileSilently(fileToDelete);
         }
     }
 

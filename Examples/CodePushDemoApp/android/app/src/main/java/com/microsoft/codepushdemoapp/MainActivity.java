@@ -1,57 +1,78 @@
 package com.microsoft.codepushdemoapp;
 
 import android.os.Bundle;
+import android.support.v4.app.FragmentActivity;
+import android.view.KeyEvent;
 
-import com.facebook.react.ReactActivity;
-import com.facebook.react.ReactPackage;
+import com.facebook.react.LifecycleState;
+import com.facebook.react.ReactInstanceManager;
+import com.facebook.react.ReactRootView;
+import com.facebook.react.modules.core.DefaultHardwareBackBtnHandler;
 import com.facebook.react.shell.MainReactPackage;
+import com.facebook.soloader.SoLoader;
 import com.microsoft.codepush.react.CodePush;
 
-import java.util.Arrays;
-import java.util.List;
+public class MainActivity extends FragmentActivity implements DefaultHardwareBackBtnHandler {
 
-public class MainActivity extends ReactActivity {
+    private ReactInstanceManager mReactInstanceManager;
+    private ReactRootView mReactRootView;
 
     private CodePush codePush;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        codePush = new CodePush("deployment-key-here", this, BuildConfig.DEBUG);
         super.onCreate(savedInstanceState);
+        mReactRootView = new ReactRootView(this);
+
+        codePush = new CodePush("DEPLOYMENT_KEY_HERE", this, BuildConfig.DEBUG);
+
+        ReactInstanceManager.Builder builder = ReactInstanceManager.builder()
+                .setApplication(getApplication())
+                .setJSBundleFile(codePush.getBundleUrl("index.android.bundle"))
+                .setJSMainModuleName("index.android");
+
+        String mainComponentName = "CodePushDemoApp";
+
+        mReactInstanceManager = builder.addPackage(new MainReactPackage())
+                .addPackage(codePush.getReactPackage())
+                .setUseDeveloperSupport(true)
+                .setInitialLifecycleState(LifecycleState.RESUMED)
+                .build();
+
+        mReactRootView.startReactApplication(mReactInstanceManager, mainComponentName, null);
+
+        setContentView(mReactRootView);
     }
 
     @Override
-    protected String getJSBundleFile() {
-        return this.codePush.getBundleUrl("index.android.bundle");
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_MENU && mReactInstanceManager != null) {
+            mReactInstanceManager.showDevOptionsDialog();
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
     }
 
-    /**
-     * Returns the name of the main component registered from JavaScript.
-     * This is used to schedule rendering of the component.
-     */
     @Override
-    protected String getMainComponentName() {
-        return "CodePushDemoApp";
+    public void invokeDefaultOnBackPressed() {
+      super.onBackPressed();
     }
 
-    /**
-     * Returns whether dev mode should be enabled.
-     * This enables e.g. the dev menu.
-     */
     @Override
-    protected boolean getUseDeveloperSupport() {
-        return BuildConfig.DEBUG;
+    protected void onPause() {
+        super.onPause();
+
+        if (mReactInstanceManager != null) {
+            mReactInstanceManager.onPause();
+        }
     }
 
-    /**
-     * A list of packages used by the app. If the app uses additional views
-     * or modules besides the default ones, add more packages here.
-     */
     @Override
-    protected List<ReactPackage> getPackages() {
-        return Arrays.<ReactPackage>asList(
-                new MainReactPackage(),
-                this.codePush.getReactPackage()
-        );
+    protected void onResume() {
+        super.onResume();
+
+        if (mReactInstanceManager != null) {
+            mReactInstanceManager.onResume(this, this);
+        }
     }
 }
