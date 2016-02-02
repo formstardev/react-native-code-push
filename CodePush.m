@@ -512,12 +512,7 @@ RCT_EXPORT_METHOD(notifyApplicationReady:(RCTPromiseResolveBlock)resolve
 RCT_EXPORT_METHOD(getNewStatusReport:(RCTPromiseResolveBlock)resolve
                             rejecter:(RCTPromiseRejectBlock)reject)
 {
-#ifdef DEBUG
-    // Do not report metrics if running in debug mode.
-    resolve(nil);
-#else
     if ([_bridge.bundleURL.scheme hasPrefix:@"http"]) {
-        // Do not report metrics if running bundle from packager.
         resolve(nil);
         return;
     }
@@ -542,6 +537,7 @@ RCT_EXPORT_METHOD(getNewStatusReport:(RCTPromiseResolveBlock)resolve
                 return;
             }
         } else if (isRunningBinaryVersion) {
+            // Check if the current appVersion has been reported.
             NSString *appVersion = [[CodePushConfig current] appVersion];
             resolve([CodePushTelemetryManager getBinaryUpdateReport:appVersion]);
             return;
@@ -549,7 +545,6 @@ RCT_EXPORT_METHOD(getNewStatusReport:(RCTPromiseResolveBlock)resolve
         
         resolve(nil);
     });
-#endif
 }
 
 /*
