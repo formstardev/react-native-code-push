@@ -58,10 +58,6 @@ async function checkForUpdate(deploymentKey = null) {
    *    client app is resilient to a potential issue with the update check.
    */
   if (!update || update.updateAppVersion || (update.packageHash === localPackage.packageHash)) {
-    if (update && update.updateAppVersion) {
-      log("An update is available but it is targeting a newer binary version than you are currently running.");
-    }
-    
     return null;
   } else {     
     const remotePackage = { ...update, ...PackageMixins.remote(sdk.reportStatusDownload) };
@@ -140,7 +136,12 @@ function log(message) {
 }
 
 async function notifyApplicationReady() {
-  await NativeCodePush.notifyApplicationReady();  
+  await NativeCodePush.notifyApplicationReady();
+  if (__DEV__) {
+    // Don't report metrics if in DEV mode.
+    return;
+  }
+  
   const statusReport = await NativeCodePush.getNewStatusReport();
   if (statusReport) {
     const config = await getConfiguration();
@@ -253,12 +254,7 @@ async function sync(options = {}, syncStatusChangeCallback, downloadProgressCall
       return CodePush.SyncStatus.UPDATE_INSTALLED;
     };
     
-    const updateShouldBeIgnored = remotePackage && (remotePackage.failedInstall && syncOptions.ignoreFailedUpdates);
-    if (!remotePackage || updateShouldBeIgnored) {
-      if (updateShouldBeIgnored) {
-          log("An update is available, but it is being ignored due to having been previously rolled back.");
-      }
-      
+    if (!remotePackage || (remotePackage.failedInstall && syncOptions.ignoreFailedUpdates)) {
       syncStatusChangeCallback(CodePush.SyncStatus.UP_TO_DATE);
       return CodePush.SyncStatus.UP_TO_DATE;
     } else if (syncOptions.updateDialog) {
