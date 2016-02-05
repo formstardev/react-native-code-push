@@ -18,12 +18,14 @@ RCT_EXPORT_MODULE()
 static BOOL needToReportRollback = NO;
 static BOOL isRunningBinaryVersion = NO;
 static BOOL testConfigurationFlag = NO;
+static NSString *binaryBundleDate = nil;
 
 // These constants represent valid deployment statuses
 static NSString *const DeploymentFailed = @"DeploymentFailed";
 static NSString *const DeploymentSucceeded = @"DeploymentSucceeded";
 
 // These keys represent the names we use to store data in NSUserDefaults
+static NSString *const BinaryBundleDateKey = @"CODE_PUSH_BINARY_DATE";
 static NSString *const FailedUpdatesKey = @"CODE_PUSH_FAILED_UPDATES";
 static NSString *const PendingUpdateKey = @"CODE_PUSH_PENDING_UPDATE";
 
@@ -56,6 +58,7 @@ static NSString *const PackageIsPendingKey = @"isPending";
     NSError *error;
     NSString *packageFile = [CodePushPackage getCurrentPackageBundlePath:&error];
     NSURL *binaryJsBundleUrl = [[NSBundle mainBundle] URLForResource:resourceName withExtension:resourceExtension];
+    [self setBinaryBundleDate:binaryJsBundleUrl];
     
     NSString *logMessageFormat = @"Loading JS bundle from %@";
     
@@ -65,10 +68,6 @@ static NSString *const PackageIsPendingKey = @"isPending";
         return binaryJsBundleUrl;
     }
     
-    NSDictionary *binaryFileAttributes = [[NSFileManager defaultManager] attributesOfItemAtPath:[binaryJsBundleUrl path] error:nil];
-    NSDictionary *appFileAttribs = [[NSFileManager defaultManager] attributesOfItemAtPath:packageFile error:nil];
-    NSDate *binaryDate = [binaryFileAttributes objectForKey:NSFileModificationDate];
-    NSDate *packageDate = [appFileAttribs objectForKey:NSFileModificationDate];
     NSString *binaryAppVersion = [[CodePushConfig current] appVersion];
     NSDictionary *currentPackageMetadata = [CodePushPackage getCurrentPackage:&error];
     if (error || !currentPackageMetadata) {
@@ -77,9 +76,10 @@ static NSString *const PackageIsPendingKey = @"isPending";
         return binaryJsBundleUrl;
     }
     
+    NSString *packageDate = [currentPackageMetadata objectForKey:BinaryBundleDateKey];
     NSString *packageAppVersion = [currentPackageMetadata objectForKey:@"appVersion"];
     
-    if ([binaryDate compare:packageDate] == NSOrderedAscending && ([CodePush isUsingTestConfiguration] ||[binaryAppVersion isEqualToString:packageAppVersion])) {
+    if ([binaryBundleDate isEqualToString:packageDate] && ([CodePush isUsingTestConfiguration] ||[binaryAppVersion isEqualToString:packageAppVersion])) {
         // Return package file because it is newer than the app store binary's JS bundle
         NSURL *packageUrl = [[NSURL alloc] initFileURLWithPath:packageFile];
         NSLog(logMessageFormat, packageUrl);
@@ -109,6 +109,16 @@ static NSString *const PackageIsPendingKey = @"isPending";
 + (BOOL)isUsingTestConfiguration
 {
     return testConfigurationFlag;
+}
+
+/*
+ * This caches the binary's jsbundle modified date in memory as a string.
+ */
++ (void)setBinaryBundleDate:(NSURL *)binaryJsBundleUrl
+{
+    NSDictionary *binaryFileAttributes = [[NSFileManager defaultManager] attributesOfItemAtPath:[binaryJsBundleUrl path] error:nil];
+    NSDate *binaryDate = [binaryFileAttributes objectForKey:NSFileModificationDate];
+    binaryBundleDate = [NSString stringWithFormat:@"%f", [binaryDate timeIntervalSince1970]];
 }
 
 + (void)setDeploymentKey:(NSString *)deploymentKey
@@ -367,7 +377,13 @@ RCT_EXPORT_METHOD(downloadUpdate:(NSDictionary*)updatePackage
                         rejecter:(RCTPromiseRejectBlock)reject)
 {
     dispatch_async(dispatch_get_main_queue(), ^{
-        [CodePushPackage downloadPackage:updatePackage
+        NSDictionary* mutableUpdatePackage = [updatePackage mutableCopy];
+        if (binaryBundleDate != nil) {
+            [mutableUpdatePackage setValue:binaryBundleDate
+                                    forKey:BinaryBundleDateKey];
+        }
+        
+        [CodePushPackage downloadPackage:mutableUpdatePackage
             // The download is progressing forward
             progressCallback:^(long long expectedContentLength, long long receivedContentLength) {
                 // Notify the script-side about the progress
@@ -381,7 +397,7 @@ RCT_EXPORT_METHOD(downloadUpdate:(NSDictionary*)updatePackage
             // The download completed
             doneCallback:^{
                 NSError *err;
-                NSDictionary *newPackage = [CodePushPackage getPackage:updatePackage[PackageHashKey] error:&err];
+                NSDictionary *newPackage = [CodePushPackage getPackage:mutableUpdatePackage[PackageHashKey] error:&err];
                     
                 if (err) {
                     return reject([NSString stringWithFormat: @"%lu", (long)err.code], err.localizedDescription, err);
@@ -392,7 +408,7 @@ RCT_EXPORT_METHOD(downloadUpdate:(NSDictionary*)updatePackage
             // The download failed
             failCallback:^(NSError *err) {
                 if ([CodePushPackage isCodePushError:err]) {
-                    [self saveFailedUpdate:updatePackage];
+                    [self saveFailedUpdate:mutableUpdatePackage];
                 }
                 
                 reject([NSString stringWithFormat: @"%lu", (long)err.code], err.localizedDescription, err);
