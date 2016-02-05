@@ -228,16 +228,8 @@ NSString * const UnzippedFolderName = @"unzipped";
             NSString * unzippedFolderPath = [CodePushPackage getUnzippedFolderPath];
             NSMutableDictionary * mutableUpdatePackage = [updatePackage mutableCopy];
             if (isZip) {
-                if ([[NSFileManager defaultManager] fileExistsAtPath:unzippedFolderPath]) {
-                    [[NSFileManager defaultManager] removeItemAtPath:unzippedFolderPath
-                                                               error:&error];
-                    if (error) {
-                        failCallback(error);
-                        return;
-                    }
-                }
-                
                 NSError *nonFailingError = nil;
+                
                 [SSZipArchive unzipFileAtPath:downloadFilePath
                                 toDestination:unzippedFolderPath];
                 [[NSFileManager defaultManager] removeItemAtPath:downloadFilePath
@@ -293,11 +285,6 @@ NSString * const UnzippedFolderName = @"unzipped";
                 [CodePushPackage copyEntriesInFolder:unzippedFolderPath
                                           destFolder:newPackageFolderPath
                                                error:&error];
-                if (error) {
-                    failCallback(error);
-                    return;
-                }
-                
                 [[NSFileManager defaultManager] removeItemAtPath:unzippedFolderPath
                                                            error:&nonFailingError];
                 if (nonFailingError) {
@@ -462,7 +449,7 @@ NSString * const UnzippedFolderName = @"unzipped";
 }
 
 + (void)installPackage:(NSDictionary *)updatePackage
-               error:(NSError **)error
+                 error:(NSError **)error
 {
     NSString *packageHash = updatePackage[@"packageHash"];
     NSMutableDictionary *info = [self getCurrentPackageInfo:error];
