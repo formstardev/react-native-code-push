@@ -152,11 +152,9 @@ public class FileUtils {
             ZipEntry entry;
 
             File destinationFolder = new File(destination);
-            if (destinationFolder.exists()) {
-                deleteDirectory(destinationFolder);
+            if (!destinationFolder.exists()) {
+                destinationFolder.mkdirs();
             }
-            
-            destinationFolder.mkdirs();
 
             byte[] buffer = new byte[WRITE_BUFFER_SIZE];
             while ((entry = zipStream.getNextEntry()) != null) {
