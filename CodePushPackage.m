@@ -228,8 +228,16 @@ NSString * const UnzippedFolderName = @"unzipped";
             NSString * unzippedFolderPath = [CodePushPackage getUnzippedFolderPath];
             NSMutableDictionary * mutableUpdatePackage = [updatePackage mutableCopy];
             if (isZip) {
-                NSError *nonFailingError = nil;
+                if ([[NSFileManager defaultManager] fileExistsAtPath:unzippedFolderPath]) {
+                    [[NSFileManager defaultManager] removeItemAtPath:unzippedFolderPath
+                                                               error:&error];
+                    if (error) {
+                        failCallback(error);
+                        return;
+                    }
+                }
                 
+                NSError *nonFailingError = nil;
                 [SSZipArchive unzipFileAtPath:downloadFilePath
                                 toDestination:unzippedFolderPath];
                 [[NSFileManager defaultManager] removeItemAtPath:downloadFilePath
@@ -285,6 +293,11 @@ NSString * const UnzippedFolderName = @"unzipped";
                 [CodePushPackage copyEntriesInFolder:unzippedFolderPath
                                           destFolder:newPackageFolderPath
                                                error:&error];
+                if (error) {
+                    failCallback(error);
+                    return;
+                }
+                
                 [[NSFileManager defaultManager] removeItemAtPath:unzippedFolderPath
                                                            error:&nonFailingError];
                 if (nonFailingError) {
@@ -449,8 +462,7 @@ NSString * const UnzippedFolderName = @"unzipped";
 }
 
 + (void)installPackage:(NSDictionary *)updatePackage
-   removePendingUpdate:(BOOL)removePendingUpdate
-                 error:(NSError **)error
+               error:(NSError **)error
 {
     NSString *packageHash = updatePackage[@"packageHash"];
     NSMutableDictionary *info = [self getCurrentPackageInfo:error];
@@ -459,32 +471,19 @@ NSString * const UnzippedFolderName = @"unzipped";
         return;
     }
     
-    if (!removePendingUpdate) {
-        NSString *currentPackageFolderPath = [self getCurrentPackageFolderPath:error];
-        if (!*error && currentPackageFolderPath) {
-            // Error in deleting pending package will not cause the entire operation to fail.
-            NSError *deleteError;
-            [[NSFileManager defaultManager] removeItemAtPath:currentPackageFolderPath
-                                                       error:&deleteError];
-            if (deleteError) {
-                NSLog(@"Error deleting pending package: %@", deleteError);
-            }
+    NSString *previousPackageHash = [self getPreviousPackageHash:error];
+    if (!*error && previousPackageHash && ![previousPackageHash isEqualToString:packageHash]) {
+        NSString *previousPackageFolderPath = [self getPackageFolderPath:previousPackageHash];
+        // Error in deleting old package will not cause the entire operation to fail.
+        NSError *deleteError;
+        [[NSFileManager defaultManager] removeItemAtPath:previousPackageFolderPath
+                                                   error:&deleteError];
+        if (deleteError) {
+            NSLog(@"Error deleting old package: %@", deleteError);
         }
-    } else {
-        NSString *previousPackageHash = [self getPreviousPackageHash:error];
-        if (!*error && previousPackageHash && ![previousPackageHash isEqualToString:packageHash]) {
-            NSString *previousPackageFolderPath = [self getPackageFolderPath:previousPackageHash];
-            // Error in deleting old package will not cause the entire operation to fail.
-            NSError *deleteError;
-            [[NSFileManager defaultManager] removeItemAtPath:previousPackageFolderPath
-                                                       error:&deleteError];
-            if (deleteError) {
-                NSLog(@"Error deleting old package: %@", deleteError);
-            }
-        }
-        [info setValue:info[@"currentPackage"] forKey:@"previousPackage"];
     }
     
+    [info setValue:info[@"currentPackage"] forKey:@"previousPackage"];
     [info setValue:packageHash forKey:@"currentPackage"];
 
     [self updateCurrentPackageInfo:info

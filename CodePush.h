@@ -69,7 +69,6 @@ failCallback:(void (^)(NSError *err))failCallback;
 @interface CodePushPackage : NSObject
 
 + (void)installPackage:(NSDictionary *)updatePackage
-   removePendingUpdate:(BOOL)removePendingUpdate
                  error:(NSError **)error;
 
 + (NSDictionary *)getCurrentPackage:(NSError **)error;
