@@ -12,6 +12,12 @@ NSString * const StatusFile = @"codepush.json";
 NSString * const UpdateBundleFileName = @"app.jsbundle";
 NSString * const UnzippedFolderName = @"unzipped";
 
+
++ (NSString *)getBinaryAssetsPath
+{
+    return [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:[CodePushUpdateUtils getAssetsFolderName]];
+}
+
 + (NSString *)getCodePushPath
 {
     NSString* codePushPath = [[CodePush getApplicationSupportDirectory] stringByAppendingPathComponent:@"CodePush"];
@@ -209,7 +215,7 @@ NSString * const UnzippedFolderName = @"unzipped";
     NSError *error;
     
     if ([[NSFileManager defaultManager] fileExistsAtPath:newUpdateFolderPath]) {
-        // This removes any stale data in newPackageFolderPath that could have been left
+        // This removes any stale data in newUpdateFolderPath that could have been left
         // uncleared due to a crash or error during the download or install process.
         [[NSFileManager defaultManager] removeItemAtPath:newUpdateFolderPath
                                                    error:&error];
@@ -267,12 +273,41 @@ NSString * const UnzippedFolderName = @"unzipped";
                         return;
                     }
                     
-                    [[NSFileManager defaultManager] copyItemAtPath:currentPackageFolderPath
-                                                            toPath:newUpdateFolderPath
-                                                             error:&error];
-                    if (error) {
-                        failCallback(error);
-                        return;
+                    if (currentPackageFolderPath == nil) {
+                        // Currently running the binary version, copy files from the bundled resources
+                        NSString *newUpdateCodePushPath = [newUpdateFolderPath stringByAppendingPathComponent:[CodePushUpdateUtils getManifestFolderPrefix]];
+                        [[NSFileManager defaultManager] createDirectoryAtPath:newUpdateCodePushPath
+                                                  withIntermediateDirectories:YES
+                                                                   attributes:nil
+                                                                        error:&error];
+                        if (error) {
+                            failCallback(error);
+                            return;
+                        }
+                        
+                        [[NSFileManager defaultManager] copyItemAtPath:[self getBinaryAssetsPath]
+                                                                toPath:[newUpdateCodePushPath stringByAppendingPathComponent:[CodePushUpdateUtils getAssetsFolderName]]
+                                                                 error:&error];
+                        if (error) {
+                            failCallback(error);
+                            return;
+                        }
+                        
+                        [[NSFileManager defaultManager] copyItemAtPath:[[CodePush binaryBundleURL] path]
+                                                                toPath:[newUpdateCodePushPath stringByAppendingPathComponent:[[CodePush binaryBundleURL] lastPathComponent]]
+                                                                 error:&error];
+                        if (error) {
+                            failCallback(error);
+                            return;
+                        }
+                    } else {
+                        [[NSFileManager defaultManager] copyItemAtPath:currentPackageFolderPath
+                                                                toPath:newUpdateFolderPath
+                                                                 error:&error];
+                        if (error) {
+                            failCallback(error);
+                            return;
+                        }
                     }
                     
                     // Delete files mentioned in the manifest.
@@ -331,7 +366,23 @@ NSString * const UnzippedFolderName = @"unzipped";
                     return;
                 }
                 
-                if (relativeBundlePath) {                    
+                if (relativeBundlePath) {
+                    NSString *absoluteBundlePath = [newUpdateFolderPath stringByAppendingPathComponent:relativeBundlePath];
+                    NSDictionary *bundleFileAttributes = [[[NSFileManager defaultManager] attributesOfItemAtPath:absoluteBundlePath error:&error] mutableCopy];
+                    if (error) {
+                        failCallback(error);
+                        return;
+                    }
+                    
+                    [bundleFileAttributes setValue:[NSDate date] forKey:NSFileModificationDate];
+                    [[NSFileManager defaultManager] setAttributes:bundleFileAttributes
+                                                     ofItemAtPath:absoluteBundlePath
+                                                            error:&error];
+                    if (error) {
+                        failCallback(error);
+                        return;
+                    }
+                    
                     [mutableUpdatePackage setValue:relativeBundlePath forKey:RelativeBundlePathKey];
                 } else {
                     error = [[NSError alloc] initWithDomain:CodePushErrorDomain
@@ -339,7 +390,7 @@ NSString * const UnzippedFolderName = @"unzipped";
                                                    userInfo:@{
                                                               NSLocalizedDescriptionKey:
                                                                   NSLocalizedString(@"Update is invalid - no files with extension .jsbundle or .bundle were found in the update package.", nil)
-                                                              }];
+                                                             }];
                     failCallback(error);
                     return;
                 }
@@ -366,7 +417,7 @@ NSString * const UnzippedFolderName = @"unzipped";
                                                    userInfo:@{
                                                               NSLocalizedDescriptionKey:
                                                                   NSLocalizedString(@"The update contents failed the data integrity check.", nil)
-                                                              }];
+                                                             }];
                     failCallback(error);
                     return;
                 }
