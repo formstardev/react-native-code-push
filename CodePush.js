@@ -1,7 +1,6 @@
 import { AcquisitionManager as Sdk } from "code-push/script/acquisition-sdk";
 import { Alert } from "./AlertAdapter";
 import requestFetchAdapter from "./request-fetch-adapter";
-import semver from "semver";
 import { Platform } from "react-native";
 
 let NativeCodePush = require("react-native").NativeModules.CodePush;
@@ -41,7 +40,7 @@ async function checkForUpdate(deploymentKey = null) {
    * in any updates for current app store version, regardless of hash.
    */
   let queryPackage;
-  if (localPackage && localPackage.appVersion && semver.compare(localPackage.appVersion, config.appVersion) === 0) {
+  if (localPackage && localPackage.appVersion && localPackage.appVersion === config.appVersion) {
     queryPackage = localPackage;
   } else {
     queryPackage = { appVersion: config.appVersion };
@@ -227,21 +226,21 @@ const sync = (() => {
 
 /*
  * The syncInternal method provides a simple, one-line experience for
- * incorporating the check, download and application of an update.
+ * incorporating the check, download and installation of an update.
  * 
  * It simply composes the existing API methods together and adds additional
  * support for respecting mandatory updates, ignoring previously failed
  * releases, and displaying a standard confirmation UI to the end-user
  * when an update is available.
  */
-async function syncInternal(options = {}, syncStatusChangeCallback, downloadProgressCallback) {  
+async function syncInternal(options = {}, syncStatusChangeCallback, downloadProgressCallback) {
+  let resolvedInstallMode;
   const syncOptions = {
-    
     deploymentKey: null,
     ignoreFailedUpdates: true,
     installMode: CodePush.InstallMode.ON_NEXT_RESTART,
+    mandatoryInstallMode: CodePush.InstallMode.IMMEDIATE,
     updateDialog: null,
-    
     ...options 
   };
   
@@ -272,7 +271,7 @@ async function syncInternal(options = {}, syncStatusChangeCallback, downloadProg
              * If the install mode is IMMEDIATE, this will not get returned as the
              * app will be restarted to a new Javascript context.
              */
-            if (syncOptions.installMode == CodePush.InstallMode.ON_NEXT_RESTART) {
+            if (resolvedInstallMode == CodePush.InstallMode.ON_NEXT_RESTART) {
               log("Update is installed and will be run on the next app restart.");
             } else {
               log("Update is installed and will be run when the app next resumes.");
@@ -300,8 +299,11 @@ async function syncInternal(options = {}, syncStatusChangeCallback, downloadProg
       syncStatusChangeCallback(CodePush.SyncStatus.DOWNLOADING_PACKAGE);
       const localPackage = await remotePackage.download(downloadProgressCallback);
       
+      // Determine the correct install mode based on whether the update is mandatory or not.
+      resolvedInstallMode = localPackage.isMandatory ? syncOptions.mandatoryInstallMode : syncOptions.installMode;
+      
       syncStatusChangeCallback(CodePush.SyncStatus.INSTALLING_UPDATE);
-      await localPackage.install(syncOptions.installMode, () => {
+      await localPackage.install(resolvedInstallMode, () => {
         syncStatusChangeCallback(CodePush.SyncStatus.UPDATE_INSTALLED);
       });
       
