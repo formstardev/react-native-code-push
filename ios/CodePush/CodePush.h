@@ -1,6 +1,6 @@
-#import <Foundation/Foundation.h>
+#import "RCTBridgeModule.h"
 
-@interface CodePush : NSObject
+@interface CodePush : NSObject <RCTBridgeModule>
 
 + (NSURL *)binaryBundleURL;
 /*
