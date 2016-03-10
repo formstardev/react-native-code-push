@@ -239,7 +239,6 @@ async function syncInternal(options = {}, syncStatusChangeCallback, downloadProg
     ignoreFailedUpdates: true,
     installMode: CodePush.InstallMode.ON_NEXT_RESTART,
     mandatoryInstallMode: CodePush.InstallMode.IMMEDIATE,
-    minimumBackgroundDuration: 0,
     updateDialog: null,
     ...options 
   };
@@ -274,11 +273,7 @@ async function syncInternal(options = {}, syncStatusChangeCallback, downloadProg
             if (resolvedInstallMode == CodePush.InstallMode.ON_NEXT_RESTART) {
               log("Update is installed and will be run on the next app restart.");
             } else {
-              if (syncOptions.minimumBackgroundDuration > 0) {
-                log(`Update is installed and will be run after the app has been in the background for at least ${syncOptions.minimumBackgroundDuration} seconds.`);
-              } else {
-                log("Update is installed and will be run when the app next resumes.");
-              }
+              log("Update is installed and will be run when the app next resumes.");
             }
             break;
           case CodePush.SyncStatus.UNKNOWN_ERROR:
@@ -307,7 +302,7 @@ async function syncInternal(options = {}, syncStatusChangeCallback, downloadProg
       resolvedInstallMode = localPackage.isMandatory ? syncOptions.mandatoryInstallMode : syncOptions.installMode;
       
       syncStatusChangeCallback(CodePush.SyncStatus.INSTALLING_UPDATE);
-      await localPackage.install(resolvedInstallMode, syncOptions.minimumBackgroundDuration, () => {
+      await localPackage.install(resolvedInstallMode, () => {
         syncStatusChangeCallback(CodePush.SyncStatus.UPDATE_INSTALLED);
       });
       

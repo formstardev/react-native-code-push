@@ -37,9 +37,9 @@ module.exports = (NativeCodePush) => {
   };
 
   const local = {
-    async install(installMode = NativeCodePush.codePushInstallModeOnNextRestart, minimumBackgroundDuration = 0, updateInstalledCallback) {
+    async install(installMode = NativeCodePush.codePushInstallModeOnNextRestart, updateInstalledCallback) {
       const localPackage = this;
-      await NativeCodePush.installUpdate(this, installMode, minimumBackgroundDuration);
+      await NativeCodePush.installUpdate(this, installMode);
       updateInstalledCallback && updateInstalledCallback();
       if (installMode == NativeCodePush.codePushInstallModeImmediate) {
         NativeCodePush.restartApp(false);
