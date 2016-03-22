@@ -31,6 +31,7 @@ public class CodePushPackage {
     private final String RELATIVE_BUNDLE_PATH_KEY = "bundlePath";
     private final String STATUS_FILE = "codepush.json";
     private final String UNZIPPED_FOLDER_NAME = "unzipped";
+    private final String UPDATE_BUNDLE_FILE_NAME = "app.jsbundle";
 
     private String documentsDirectory;
 
@@ -94,7 +95,7 @@ public class CodePushPackage {
         return getPackageFolderPath(packageHash);
     }
 
-    public String getCurrentPackageBundlePath(String bundleFileName) {
+    public String getCurrentPackageBundlePath() {
         String packageFolder = getCurrentPackageFolderPath();
         if (packageFolder == null) {
             return null;
@@ -103,7 +104,7 @@ public class CodePushPackage {
         WritableMap currentPackage = getCurrentPackage();
         String relativeBundlePath = CodePushUtils.tryGetString(currentPackage, RELATIVE_BUNDLE_PATH_KEY);
         if (relativeBundlePath == null) {
-            return CodePushUtils.appendPathComponent(packageFolder, bundleFileName);
+            return CodePushUtils.appendPathComponent(packageFolder, UPDATE_BUNDLE_FILE_NAME);
         } else {
             return CodePushUtils.appendPathComponent(packageFolder, relativeBundlePath);
         }
@@ -269,7 +270,7 @@ public class CodePushPackage {
             }
         } else {
             // File is a jsbundle, move it to a folder with the packageHash as its name
-            FileUtils.moveFile(downloadFile, newUpdateFolderPath, expectedBundleFileName);
+            FileUtils.moveFile(downloadFile, newUpdateFolderPath, UPDATE_BUNDLE_FILE_NAME);
         }
 
         // Save metadata to the folder.
@@ -306,7 +307,7 @@ public class CodePushPackage {
         updateCurrentPackageInfo(info);
     }
 
-    public void downloadAndReplaceCurrentBundle(String remoteBundleUrl, String bundleFileName) throws IOException {
+    public void downloadAndReplaceCurrentBundle(String remoteBundleUrl) throws IOException {
         URL downloadUrl;
         HttpURLConnection connection = null;
         BufferedInputStream bin = null;
@@ -316,7 +317,7 @@ public class CodePushPackage {
             downloadUrl = new URL(remoteBundleUrl);
             connection = (HttpURLConnection) (downloadUrl.openConnection());
             bin = new BufferedInputStream(connection.getInputStream());
-            File downloadFile = new File(getCurrentPackageBundlePath(bundleFileName));
+            File downloadFile = new File(getCurrentPackageBundlePath());
             downloadFile.delete();
             fos = new FileOutputStream(downloadFile);
             bout = new BufferedOutputStream(fos, DOWNLOAD_BUFFER_SIZE);
