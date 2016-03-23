@@ -48,8 +48,8 @@ We try our best to maintain backwards compatability of our plugin with previous 
 | <0.14.0                 | **Unsupported**                                |
 | v0.14.0                 | v1.3.0 *(introduced Android support)*          |
 | v0.15.0-v0.18.0         | v1.4.0-v1.6.0 *(introduced iOS asset support)* |
-| v0.19.0-v0.22.0         | v1.7.0+ *(introduced Android asset support)*   |
-| v0.23.0+                | TBD :) We work hard to respond to new RN releases, but they do occasionally break us. We will update this chart with each RN release, so that users can check to see what our "official" support is.
+| v0.19.0-v0.23.0         | v1.7.0+ *(introduced Android asset support)*   |
+| v0.24.0+                | TBD :) We work hard to respond to new RN releases, but they do occasionally break us. We will update this chart with each RN release, so that users can check to see what our "official" support is.
 
 ## Supported Components
 
@@ -119,7 +119,7 @@ We hope to eventually remove the need for steps #2-4, but in the meantime, RNPM 
 1. Add the CodePush plugin dependency to your `Podfile`, pointing at the path where NPM installed it
 
     ```ruby
-    pod 'CodePush', :path => './node_modules/react-native-code-push`
+    pod 'CodePush', :path => './node_modules/react-native-code-push'
     ```
     
 2. Run `pod install`
@@ -269,7 +269,7 @@ After installing the plugin and syncing your Android Studio project with Gradle,
     }
     ```
 
-2. Ensure that the `android.defaultConfig.versionName` property in your `android/app/build.gradle` file is set to a semver-compliant value. Note that if the value provided is missing a patch version, the CodePush server will assume it is `0`, i.e. `1.0` will be treated as `1.0.0`.
+2. Ensure that the `android.defaultConfig.versionName` property in your `android/app/build.gradle` file is set to a semver compliant value. Note that if the value provided is missing a patch version, the CodePush server will assume it is `0`, i.e. `1.0` will be treated as `1.0.0`.
     
     ```gradle
     android {
@@ -297,7 +297,12 @@ After installing the plugin and syncing your Android Studio project with Gradle,
     import com.microsoft.codepush.react.CodePush;
 
     public class MainActivity extends ReactActivity {
-        // 2. Override the getJSBundleFile method in order to let
+        // 2. Define a private field to hold the CodePush runtime instance
+        private CodePush _codePush;
+
+        ...
+
+        // 3. Override the getJSBundleFile method in order to let
         // the CodePush runtime determine where to get the JS
         // bundle location from on each app start
         @Override
@@ -307,20 +312,41 @@ After installing the plugin and syncing your Android Studio project with Gradle,
 
         @Override
         protected List<ReactPackage> getPackages() {
-            // 3. Instantiate an instance of the CodePush runtime and add it to the list of
-            // existing packages, specifying the right deployment key. If you don't already 
-            // have it, you can run "code-push deployment ls <appName> -k" to retrieve your key.
+            // 4. Instantiate an instance of the CodePush runtime, using the right deployment key. If you don't
+            // already have it, you can run "code-push deployment ls <appName> -k" to retrieve your key.
+            this._codePush = new CodePush("0dsIDongIcoH0mqAmoR0CYb5FhBZNy1w4Bf-l", this, BuildConfig.DEBUG);
+
+            // 5. Add the CodePush package to the list of existing packages
             return Arrays.<ReactPackage>asList(
-                new MainReactPackage(), 
-                new CodePush("deployment-key-here", this, BuildConfig.DEBUG)
-            );
+                new MainReactPackage(), this._codePush.getReactPackage());
         }
 
         ...
     }
     ```
+    
+2. If you used RNPM to install/link the CodePush plugin, there are two additional changes you'll need to make due to the fact that RNPM makes some assumptions about 3rd party modules that we don't currently support. If you're not using RNPM then simply skip to step #3:
 
-2. Ensure that the `android.defaultConfig.versionName` property in your `android/app/build.gradle` file is set to a semver-compliant value. Note that if the value provided is missing a patch version, the CodePush server will assume it is `0`, i.e. `1.0` will be treated as `1.0.0`.
+    ```java
+    ...
+    // 1. Remove the following import statement
+    import com.microsoft.codepush.react.CodePushReactPackage;
+    ...
+    public class MainActivity extends ReactActivity {
+        ...
+        @Override
+        protected List<ReactPackage> getPackages() {
+            return Arrays.<ReactPackage>asList(
+                ...
+                new CodePushReactPackage() // 2. Remove this line
+                ...
+            );
+        }
+        ...
+    }
+    ```
+
+3. Ensure that the `android.defaultConfig.versionName` property in your `android/app/build.gradle` file is set to a semver compliant value. Note that if the value provided is missing a patch version, the CodePush server will assume it is `0`, i.e. `1.0` will be treated as `1.0.0`.
     
     ```gradle
     android {
