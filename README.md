@@ -7,8 +7,16 @@ This plugin provides client-side integration for the [CodePush service](http://c
 * [Supported Components](#supported-components)
 * [Getting Started](#getting-started)
 * [iOS Setup](#ios-setup)
+    * [Plugin Installation](#plugin-installation-ios)
+        * [RNPM](#plugin-installation-ios---rnpm)
+        * [CocoaPods](#plugin-installation-ios---cocoapods)
+        * ["Manual"](#plugin-installation-ios---manual)
+    * [Plugin Configuration](#plugin-configuration-ios)
 * [Android Setup](#android-setup)
-* [Windows Setup](#windows-setup)
+    * [Plugin Installation](#plugin-installation-android)
+        * [RNPM](#plugin-installation-android---rnpm)
+        * ["Manual"](#plugin-installation-android---manual)
+    * [Plugin Configuration](#plugin-configuration-android)
 * [Plugin Usage](#plugin-usage)
 * [Releasing Updates](#releasing-updates)
 * [API Reference](#api-reference)
@@ -32,7 +40,6 @@ In order to ensure that your end users always have a functioning version of your
 
 - iOS
 - Android
-- Windows
 
 We try our best to maintain backwards compatability of our plugin with previous versions of React Native, but due to the nature of the platform, and the existence of breaking changes between releases, it is possible that you need to use a specific version of the CodePush plugin in order to support the exact version of React Native you are using. The following table outlines which CodePush plugin versions officially support the respective React Native versions:
 
@@ -275,68 +282,6 @@ public class MainActivity extends ReactActivity {
         );
     }
 
-    ...
-}
-```
-
-## Windows Setup
-
-Once you've acquired the CodePush plugin, you need to integrate it into the Visual Studio project of your React Native app and configure it correctly. To do this, take the following steps:
-
-### Plugin Installation (Windows)
-
-1. Open the Visual Studio solution located at `windows\<AppName>\<AppName>.sln` within your app
-
-2. Right-click the solution node in the `Solution Explorer` window and select the `Add -> Existing Project...` menu item
-
-   ![Add Project](https://cloud.githubusercontent.com/assets/116461/14467164/ddf6312e-008e-11e6-8a10-44a8b44b5dfc.PNG)
-   
-3. Browse to the `node_modules\react-native-code-push\windows` directory, select the `CodePush.sln` file and click `OK`
-
-4. Back in the `Solution Explorer`, right-click the project node that is named after your app, and select the `Add -> Reference...` menu item
-
-   ![Add Reference](https://cloud.githubusercontent.com/assets/116461/14467154/d833bc98-008e-11e6-8e95-09864b1f05ef.PNG)
-
-5. Select the `Projects` tab on the left hand side, check the `CodePush` item and then click `OK`
-
-   ![Add Reference Dialog](https://cloud.githubusercontent.com/assets/116461/14467147/cb805b6e-008e-11e6-964f-f856c59b65af.PNG)
-   
-### Plugin Configuration (Windows)
-
-After installing the plugin, you need to configure your app to consult CodePush for the location of your JS bundle, since it will "take control" of managing the current and all future versions. To do this, update the `AppReactPage.cs` file to use CodePush via the following changes:
-
-```c#
-...
-// 1. Import the CodePush namespace 
-using CodePush.ReactNative;
-...
-class AppReactPage : ReactPage
-{
-    // 2. Update the JavaScriptBundleFile property to return the
-    // bundle URL from CodePush instead of statically from the binary
-    public override string JavaScriptBundleFile
-    {
-    	get
-        {
-       	    return CodePush.GetJavaScriptBundleFile();
-        }
-    }
-
-    // 3. Instantiate an instance of the CodePush runtime and add it to the list of
-    // existing packages, specifying the right deployment key. If you don't already 
-    // have it, you can run "code-push deployment ls <appName> -k" to retrieve your key.
-    public override List<IReactPackage> Packages
-    {
-        get
-        {
-            return new List<IReactPackage>
-            {
-                new MainReactPackage(),
-                ...
-                new CodePush("deployment-key-here", this) 
-            };
-        }
-    }
     ...
 }
 ```
@@ -775,6 +720,7 @@ Constructs the CodePush client runtime and represents the `ReactPackage` instanc
 
 The React Native community has graciously created some awesome open source apps that can serve as examples for developers that are getting started. The following is a list of OSS React Native apps that are also using CodePush, and can therefore be used to see how others are using the service:
 
+* [F8 App](https://github.com/fbsamples/f8app) - The official conference app for [F8 2016](https://www.fbf8.com/).
 * [Feline for Product Hunt](https://github.com/arjunkomath/Feline-for-Product-Hunt) - An Android client for Product Hunt.
 * [GeoEncoding](https://github.com/LynxITDigital/GeoEncoding) - An app by [Lynx IT Digital](https://digital.lynxit.com.au) which demonstrates how to use numerous React Native components and modules.
 * [Math Facts](https://github.com/Khan/math-facts) - An app by Khan Academy to help memorize math facts more easily.
