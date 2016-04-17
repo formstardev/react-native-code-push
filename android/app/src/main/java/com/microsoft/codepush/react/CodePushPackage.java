@@ -18,6 +18,7 @@ import java.net.URL;
 import java.nio.ByteBuffer;
 
 public class CodePushPackage {
+
     private final String CODE_PUSH_FOLDER_PREFIX = "CodePush";
     private final String CURRENT_PACKAGE_KEY = "currentPackage";
     private final String DIFF_MANIFEST_FILE_NAME = "hotcodepush.json";
@@ -123,21 +124,18 @@ public class CodePushPackage {
     }
 
     public WritableMap getCurrentPackage() {
-        String packageHash = getCurrentPackageHash();
-        if (packageHash == null) {
+        String folderPath = getCurrentPackageFolderPath();
+        if (folderPath == null) {
             return null;
         }
-        
-        return getPackage(packageHash);
-    }
-    
-    public WritableMap getPreviousPackage() {
-        String packageHash = getPreviousPackageHash();
-        if (packageHash == null) {
+
+        String packagePath = CodePushUtils.appendPathComponent(folderPath, PACKAGE_FILE_NAME);
+        try {
+            return CodePushUtils.getWritableMapFromFile(packagePath);
+        } catch (IOException e) {
+            // Should not happen unless the update metadata was somehow deleted.
             return null;
         }
-        
-        return getPackage(packageHash);
     }
 
     public WritableMap getPackage(String packageHash) {
@@ -342,6 +340,8 @@ public class CodePushPackage {
     }
 
     public void clearUpdates() {
+        File statusFile = new File(getStatusFilePath());
+        statusFile.delete();
         FileUtils.deleteDirectoryAtPath(getCodePushPath());
     }
 }
