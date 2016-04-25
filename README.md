@@ -32,7 +32,7 @@ A React Native app is composed of JavaScript files and any accompanying [images]
 
 The CodePush plugin helps get product improvements in front of your end users instantly, by keeping your JavaScript and images synchronized with updates you release to the CodePush server. This way, your app gets the benefits of an offline mobile experience, as well as the "web-like" agility of side-loading updates as soon as they are available. It's a win-win!
 
-In order to ensure that your end users always have a functioning version of your app, the CodePush plugin maintains a copy of the previous update, so that in the event that you accidentally push an update which includes a crash, it can automatically roll back. This way, you can rest assured that your newfound release agility won't result in users becoming blocked before you have a chance to [roll back](http://microsoft.github.io/code-push/docs/cli.html#link-10) on the server. It's a win-win-win! 
+In order to ensure that your end users always have a functioning version of your app, the CodePush plugin maintains a copy of the previous update, so that in the event that you accidentally push an update which includes a crash, it can automatically roll back. This way, you can rest assured that your newfound release agility won't result in users becoming blocked before you have a chance to [roll back](http://microsoft.github.io/code-push/docs/cli.html#link-8) on the server. It's a win-win-win! 
 
 *Note: Any product changes which touch native code (e.g. modifying your `AppDelegate.m`/`MainActivity.java` file, adding a new plugin) cannot be distributed via CodePush, and therefore, must be updated via the appropriate store(s).*
 
@@ -53,12 +53,11 @@ We try our best to maintain backwards compatability of our plugin with previous 
 
 ## Supported Components
 
-When using the React Native assets sytem (i.e. using the `require("./foo.png")` syntax), the following list represents the set of core components (and props) that support having their referenced images updated via CodePush:
+When using the React Native assets sytem (i.e. using the `require("./foo.png")` syntax), the following list represents the set of components (and props) that support having their referenced images updated via CodePush:
 
 | Component                                       | Prop(s)                                  | 
 |-------------------------------------------------|------------------------------------------|
-| `Image`                                         | `source`   |
-| `MapView.Marker` <br />*(Requires [react-native-maps](https://github.com/lelandrichardson/react-native-maps) `>=O.3.2`)* | `image`                             |
+| `Image`                                         | `source`                                    |
 | `ProgressViewIOS`                               | `progressImage`, `trackImage`            |
 | `TabBarIOS.Item`                                | `icon`, `selectedIcon`                   |
 | `ToolbarAndroid` <br />*(React Native 0.21.0+)* | `actions[].icon`, `logo`, `overflowIcon` |
@@ -68,7 +67,6 @@ The following list represents the set of components (and props) that don't curre
 | Component   | Prop(s)                                                              |
 |-------------|----------------------------------------------------------------------|
 | `SliderIOS` | `maximumTrackImage`, `minimumTrackImage`, `thumbImage`, `trackImage` |
-| `Video`     | `source`                                                             |
 
 As new core components are released, which support referencing assets, we'll update this list to ensure users know what exactly they can expect to update using CodePush.
 
@@ -380,11 +378,9 @@ When you require `react-native-code-push`, the module object provides the follow
 
 * [checkForUpdate](#codepushcheckforupdate): Asks the CodePush service whether the configured app deployment has an update available. 
 
-* [getCurrentPackage](#codepushgetcurrentpackage): Retrieves the metadata about the currently installed update (e.g. description, installation time, size). *NOTE: As of `v1.10.3-beta` of the CodePush module, this method is deprecated in favor of [`getUpdateMetadata`](#codepushgetupdatemetadata)*.
-
 * [getUpdateMetadata](#codepushgetupdatemetadata): Retrieves the metadata for an installed update (e.g. description, mandatory).
 
-* [notifyAppReady](#codepushnotifyappready): Notifies the CodePush runtime that an installed update is considered successful. If you are manually checking for and installing updates (i.e. not using the [sync](#codepushsync) method to handle it all for you), then this method **MUST** be called; otherwise CodePush will treat the update as failed and rollback to the previous version when the app next restarts.
+* [notifyApplicationReady](#codepushnotifyapplicationready): Notifies the CodePush runtime that an installed update is considered successful. If you are manually checking for and installing updates (i.e. not using the [sync](#codepushsync) method to handle it all for you), then this method **MUST** be called; otherwise CodePush will treat the update as failed and rollback to the previous version when the app next restarts.
 
 * [restartApp](#codepushrestartapp): Immediately restarts the app. If there is an update pending, it will be immediately displayed to the end user. Otherwise, calling this method simply has the same behavior as the end user killing and restarting the process.
 
@@ -417,39 +413,6 @@ codePush.checkForUpdate()
         console.log("The app is up to date!"); 
     } else {
         console.log("An update is available! Should we download it?");
-    }
-});
-```
-
-#### codePush.getCurrentPackage
-
-*NOTE: This method is considered deprecated as of `v1.10.3-beta` of the CodePush module. If you're running this version (or newer), we would recommend using the [`codePush.getUpdateMetadata`](#codepushgetupdatemetadata) instead, since it has more predictable behavior.*
-
-```javascript
-codePush.getCurrentPackage(): Promise<LocalPackage>;
-```
-
-Retrieves the metadata about the currently installed "package" (e.g. description, installation time). This can be useful for scenarios such as displaying a "what's new?" dialog after an update has been applied or checking whether there is a pending update that is waiting to be applied via a resume or restart.
-
-This method returns a `Promise` which resolves to one of two possible values:
-
-1. `null` if the app is currently running the JS bundle from the binary and not a CodePush update. This occurs in the following scenarios:
-
-    1. The end-user installed the app binary and has yet to install a CodePush update
-    1. The end-user installed an update of the binary (e.g. from the store), which cleared away the old CodePush updates, and gave precedence back to the JS binary in the binary.
-
-2. A [`LocalPackage`](#localpackage) instance which represents the metadata for the currently running CodePush update.
-
-Example Usage: 
-
-```javascript
-codePush.getCurrentPackage()
-.then((update) => {
-    // If the current app "session" represents the first time
-    // this update has run, and it had a description provided
-    // with it upon release, let's show it to the end user
-    if (update.isFirstRun && update.description) {
-        // Display a "what's new?" modal
     }
 });
 ```
@@ -619,31 +582,24 @@ In addition to the options, the `sync` method also accepts two optional function
 * __syncStatusChangedCallback__ *((syncStatus: Number) => void)* - Called when the sync process moves from one stage to another in the overall update process. The method is called with a status code which represents the current state, and can be any of the [`SyncStatus`](#syncstatus) values.
 
 * __downloadProgressCallback__ *((progress: DownloadProgress) => void)* - Called periodically when an available update is being downloaded from the CodePush server. The method is called with a `DownloadProgress` object, which contains the following two properties:
-
-    * __totalBytes__ *(Number)* - The total number of bytes expected to be received for this update (i.e. the size of the set of files which changed from the previous release).
-   
-    * __receivedBytes__ *(Number)* - The number of bytes downloaded thus far, which can be used to track download progress.
+    * __totalBytes__ *(Number)* - The total number of bytes expected to be received for this update package
+    * __receivedBytes__ *(Number)* - The number of bytes downloaded thus far.
 
 Example Usage:
 
 ```javascript
 // Prompt the user when an update is available
 // and then display a "downloading" modal 
-codePush.sync({ updateDialog: true }, 
-  (status) => {
-      switch (status) {
-          case codePush.SyncStatus.DOWNLOADING_PACKAGE:
-              // Show "downloading" modal
-              break;
-          case codePush.SyncStatus.INSTALLING_UPDATE:
-              // Hide "downloading" modal
-              break;
-      }
-  },
-  (totalBytes, receivedBytes) => { 
-    /* Update download modal progress */ 
-  }
-);
+codePush.sync({ updateDialog: true }, (status) => {
+    switch (status) {
+        case codePush.SyncStatus.DOWNLOADING_PACKAGE:
+            // Show "downloading" modal
+            break;
+        case codePush.SyncStatus.INSTALLING_UPDATE:
+            // Hide "downloading" modal
+            break;
+    }
+});
 ```
 
 This method returns a `Promise` which is resolved to a `SyncStatus` code that indicates why the `sync` call succeeded. This code can be one of the following `SyncStatus` values:
