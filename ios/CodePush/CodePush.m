@@ -7,7 +7,7 @@
 
 #import "CodePush.h"
 
-@interface CodePush () <RCTBridgeModule, RCTFrameUpdateObserver>
+@interface CodePush () <RCTBridgeModule>
 @end
 
 @implementation CodePush {
@@ -171,8 +171,6 @@ static NSString *bundleResourceName = @"main";
 
 @synthesize bridge = _bridge;
 @synthesize methodQueue = _methodQueue;
-@synthesize pauseCallback = _pauseCallback;
-@synthesize paused = _paused;
 
 /*
  * This method is used to clear updates that are installed
@@ -275,7 +273,7 @@ static NSString *bundleResourceName = @"main";
 #ifdef DEBUG
     [self clearDebugUpdates];
 #endif
-    [self pauseFrameObserver];
+
     NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
     NSDictionary *pendingUpdate = [preferences objectForKey:PendingUpdateKey];
     if (pendingUpdate) {
@@ -481,7 +479,6 @@ static NSString *bundleResourceName = @"main";
  * This is native-side of the RemotePackage.download method
  */
 RCT_EXPORT_METHOD(downloadUpdate:(NSDictionary*)updatePackage
-                  notifyProgress:(BOOL)notifyProgress
                         resolver:(RCTPromiseResolveBlock)resolve
                         rejecter:(RCTPromiseRejectBlock)reject)
 {
@@ -491,43 +488,44 @@ RCT_EXPORT_METHOD(downloadUpdate:(NSDictionary*)updatePackage
         [mutableUpdatePackage setValue:[CodePushUpdateUtils modifiedDateStringOfFileAtURL:binaryBundleURL]
                                 forKey:BinaryBundleDateKey];
     }
-    
-    if (notifyProgress) {
-        [self setupFrameObserverForDownloadProgress];
-    }
-    
+
     [CodePushPackage
         downloadPackage:mutableUpdatePackage
         expectedBundleFileName:[bundleResourceName stringByAppendingPathExtension:bundleResourceExtension]
-        operationQueue:_methodQueue
         // The download is progressing forward
         progressCallback:^(long long expectedContentLength, long long receivedContentLength) {
-            [self updateDownloadProgressForNextFrame:expectedContentLength
-                               receivedContentLength:receivedContentLength];
-            // If the download is completed, stop observing frame updates and synchronously send the last event.
-            if (expectedContentLength == receivedContentLength) {
-                [self pauseFrameObserver];
-                [self dispatchDownloadProgressEvent];
-            }
+            dispatch_async(_methodQueue, ^{
+                // Notify the script-side about the progress
+                [self.bridge.eventDispatcher
+                    sendDeviceEventWithName:@"CodePushDownloadProgress"
+                    body:@{
+                            @"totalBytes":[NSNumber numberWithLongLong:expectedContentLength],
+                            @"receivedBytes":[NSNumber numberWithLongLong:receivedContentLength]
+                          }];
+            });
         }
         // The download completed
         doneCallback:^{
-            NSError *err;
-            NSDictionary *newPackage = [CodePushPackage getPackage:mutableUpdatePackage[PackageHashKey] error:&err];
+            dispatch_async(_methodQueue, ^{
+                NSError *err;
+                NSDictionary *newPackage = [CodePushPackage getPackage:mutableUpdatePackage[PackageHashKey] error:&err];
 
-            if (err) {
-                return reject([NSString stringWithFormat: @"%lu", (long)err.code], err.localizedDescription, err);
-            }
-            resolve(newPackage);
+                if (err) {
+                    return reject([NSString stringWithFormat: @"%lu", (long)err.code], err.localizedDescription, err);
+                }
+
+                resolve(newPackage);
+            });
         }
         // The download failed
         failCallback:^(NSError *err) {
-            if ([CodePushErrorUtils isCodePushError:err]) {
-                [self saveFailedUpdate:mutableUpdatePackage];
-            }
-            
-            [self pauseFrameObserver];
-            reject([NSString stringWithFormat: @"%lu", (long)err.code], err.localizedDescription, err);
+            dispatch_async(_methodQueue, ^{
+                if ([CodePushErrorUtils isCodePushError:err]) {
+                    [self saveFailedUpdate:mutableUpdatePackage];
+                }
+
+                reject([NSString stringWithFormat: @"%lu", (long)err.code], err.localizedDescription, err);
+            });
         }];
 }
 
@@ -760,54 +758,6 @@ RCT_EXPORT_METHOD(getNewStatusReport:(RCTPromiseResolveBlock)resolve
     }
 
     resolve(nil);
-}
-
-#pragma mark - RCTFrameUpdateObserver Methods
-
-long long latestExpectedContentLength = -1;
-long long latestReceivedConentLength = -1;
-BOOL didUpdateProgress = NO;
-
-- (void)didUpdateFrame:(RCTFrameUpdate *)update
-{
-    if (!didUpdateProgress) {
-        return;
-    }
-    
-    [self dispatchDownloadProgressEvent];
-    didUpdateProgress = NO;
-}
-
-- (void)dispatchDownloadProgressEvent
-{
-    // Notify the script-side about the progress
-    [self.bridge.eventDispatcher
-     sendDeviceEventWithName:@"CodePushDownloadProgress"
-     body:@{
-            @"totalBytes":[NSNumber numberWithLongLong:latestExpectedContentLength],
-            @"receivedBytes":[NSNumber numberWithLongLong:latestReceivedConentLength]
-            }];
-}
-
-- (void)updateDownloadProgressForNextFrame:(long long)expectedContentLength
-                     receivedContentLength:(long long)receivedContentLength
-{
-    latestExpectedContentLength = expectedContentLength;
-    latestReceivedConentLength = receivedContentLength;
-    didUpdateProgress = YES;
-}
-
-
-- (void)setupFrameObserverForDownloadProgress
-{
-    didUpdateProgress = NO;
-    _paused = NO;
-}
-
-- (void)pauseFrameObserver
-{
-    didUpdateProgress = NO;
-    _paused = YES;
 }
 
 @end
