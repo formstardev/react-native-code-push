@@ -23,8 +23,4 @@ class DownloadProgress {
         }
         return map;
     }
-
-    public boolean isCompleted() {
-        return this.totalBytes == this.receivedBytes;
-    }
 }
