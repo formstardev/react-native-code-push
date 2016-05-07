@@ -30,7 +30,7 @@ In order to ensure that your end users always have a functioning version of your
 
 ## Supported React Native platforms
 
-- iOS (7+)
+- iOS (8+)
 - Android (4.1+)
 - Windows (UWP)
 
@@ -41,8 +41,8 @@ We try our best to maintain backwards compatability of our plugin with previous 
 | <0.14.0                 | **Unsupported**                                |
 | v0.14.0                 | v1.3.0 *(introduced Android support)*          |
 | v0.15.0-v0.18.0         | v1.4.0-v1.6.0 *(introduced iOS asset support)* |
-| v0.19.0-v0.25.0         | v1.7.0+ *(introduced Android asset support)*   |
-| v0.26.0+                | TBD :) We work hard to respond to new RN releases, but they do occasionally break us. We will update this chart with each RN release, so that users can check to see what our "official" support is.
+| v0.19.0-v0.26.0         | v1.7.0+ *(introduced Android asset support)*   |
+| v0.27.0+                | TBD :) We work hard to respond to new RN releases, but they do occasionally break us. We will update this chart with each RN release, so that users can check to see what our "official" support is.
 
 ## Supported Components
 
@@ -117,7 +117,11 @@ We hope to eventually remove the need for steps #2-4, but in the meantime, RNPM 
     pod 'CodePush', :path => './node_modules/react-native-code-push'
     ```
     
+    *NOTE: The above path needs to be relative to your app's `Podfile`, so adjust it as neccessary.*
+    
 2. Run `pod install`
+
+*NOTE: The CodePush `.podspec` depends on the `React` pod, and so in order to ensure that it can correctly use the version of React Native that your app is built with, please make sure to define the `React` dependency in your app's `Podfile` as explained [here](http://facebook.github.io/react-native/docs/embedded-app-ios.html#install-react-native-using-cocoapods).*
 
 #### Plugin Installation (iOS - Manual)
 
