@@ -202,7 +202,6 @@ public class CodePushUtils {
             JSONObject json = new JSONObject(content);
             return convertJsonObjectToWritable(json);
         } catch (JSONException jsonException) {
-            // Should not happen
             throw new CodePushMalformedDataException(filePath, jsonException);
         }
     }

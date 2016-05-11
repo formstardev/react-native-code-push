@@ -7,7 +7,7 @@
 
 #import "CodePush.h"
 
-@interface CodePush () <RCTBridgeModule, RCTFrameUpdateObserver>
+@interface CodePush () <RCTBridgeModule>
 @end
 
 @implementation CodePush {
@@ -15,11 +15,6 @@
     BOOL _isFirstRunAfterUpdate;
     int _minimumBackgroundDuration;
     NSDate *_lastResignedDate;
-
-    // Used to coordinate the dispatching of download progress events to JS.
-    long long _latestExpectedContentLength;
-    long long _latestReceivedConentLength;
-    BOOL _didUpdateProgress;
 }
 
 RCT_EXPORT_MODULE()
@@ -176,8 +171,6 @@ static NSString *bundleResourceName = @"main";
 
 @synthesize bridge = _bridge;
 @synthesize methodQueue = _methodQueue;
-@synthesize pauseCallback = _pauseCallback;
-@synthesize paused = _paused;
 
 /*
  * This method is used to clear updates that are installed
@@ -230,17 +223,6 @@ static NSString *bundleResourceName = @"main";
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
-- (void)dispatchDownloadProgressEvent
-{
-    // Notify the script-side about the progress
-    [self.bridge.eventDispatcher
-     sendDeviceEventWithName:@"CodePushDownloadProgress"
-     body:@{
-            @"totalBytes":[NSNumber numberWithLongLong:_latestExpectedContentLength],
-            @"receivedBytes":[NSNumber numberWithLongLong:_latestReceivedConentLength]
-            }];
-}
-
 /*
  * This method ensures that the app was packaged with a JS bundle
  * file, and if not, it throws the appropriate exception.
@@ -291,7 +273,7 @@ static NSString *bundleResourceName = @"main";
 #ifdef DEBUG
     [self clearDebugUpdates];
 #endif
-    _paused = YES;
+
     NSUserDefaults *preferences = [NSUserDefaults standardUserDefaults];
     NSDictionary *pendingUpdate = [preferences objectForKey:PendingUpdateKey];
     if (pendingUpdate) {
@@ -497,7 +479,6 @@ static NSString *bundleResourceName = @"main";
  * This is native-side of the RemotePackage.download method
  */
 RCT_EXPORT_METHOD(downloadUpdate:(NSDictionary*)updatePackage
-                  notifyProgress:(BOOL)notifyProgress
                         resolver:(RCTPromiseResolveBlock)resolve
                         rejecter:(RCTPromiseRejectBlock)reject)
 {
@@ -508,52 +489,43 @@ RCT_EXPORT_METHOD(downloadUpdate:(NSDictionary*)updatePackage
                                 forKey:BinaryBundleDateKey];
     }
 
-    if (notifyProgress) {
-        // Set up and unpause the frame observer so that it can emit
-        // progress events every frame if the progress is updated.
-        _didUpdateProgress = NO;
-        _paused = NO;
-    }
-
     [CodePushPackage
         downloadPackage:mutableUpdatePackage
         expectedBundleFileName:[bundleResourceName stringByAppendingPathExtension:bundleResourceExtension]
-        operationQueue:_methodQueue
         // The download is progressing forward
         progressCallback:^(long long expectedContentLength, long long receivedContentLength) {
-            // Update the download progress so that the frame observer can notify the JS side
-            _latestExpectedContentLength = expectedContentLength;
-            _latestReceivedConentLength = receivedContentLength;
-            _didUpdateProgress = YES;
-
-            // If the download is completed, stop observing frame
-            // updates and synchronously send the last event.
-            if (expectedContentLength == receivedContentLength) {
-                _didUpdateProgress = NO;
-                _paused = YES;
-                [self dispatchDownloadProgressEvent];
-            }
+            dispatch_async(_methodQueue, ^{
+                // Notify the script-side about the progress
+                [self.bridge.eventDispatcher
+                    sendDeviceEventWithName:@"CodePushDownloadProgress"
+                    body:@{
+                            @"totalBytes":[NSNumber numberWithLongLong:expectedContentLength],
+                            @"receivedBytes":[NSNumber numberWithLongLong:receivedContentLength]
+                          }];
+            });
         }
         // The download completed
         doneCallback:^{
-            NSError *err;
-            NSDictionary *newPackage = [CodePushPackage getPackage:mutableUpdatePackage[PackageHashKey] error:&err];
+            dispatch_async(_methodQueue, ^{
+                NSError *err;
+                NSDictionary *newPackage = [CodePushPackage getPackage:mutableUpdatePackage[PackageHashKey] error:&err];
 
-            if (err) {
-                return reject([NSString stringWithFormat: @"%lu", (long)err.code], err.localizedDescription, err);
-            }
-            resolve(newPackage);
+                if (err) {
+                    return reject([NSString stringWithFormat: @"%lu", (long)err.code], err.localizedDescription, err);
+                }
+
+                resolve(newPackage);
+            });
         }
         // The download failed
         failCallback:^(NSError *err) {
-            if ([CodePushErrorUtils isCodePushError:err]) {
-                [self saveFailedUpdate:mutableUpdatePackage];
-            }
+            dispatch_async(_methodQueue, ^{
+                if ([CodePushErrorUtils isCodePushError:err]) {
+                    [self saveFailedUpdate:mutableUpdatePackage];
+                }
 
-            // Stop observing frame updates if the download fails.
-            _didUpdateProgress = NO;
-            _paused = YES;
-            reject([NSString stringWithFormat: @"%lu", (long)err.code], err.localizedDescription, err);
+                reject([NSString stringWithFormat: @"%lu", (long)err.code], err.localizedDescription, err);
+            });
         }];
 }
 
@@ -783,37 +755,9 @@ RCT_EXPORT_METHOD(getNewStatusReport:(RCTPromiseResolveBlock)resolve
         NSString *appVersion = [[CodePushConfig current] appVersion];
         resolve([CodePushTelemetryManager getBinaryUpdateReport:appVersion]);
         return;
-    } else {
-        NSDictionary *retryStatusReport = [CodePushTelemetryManager getRetryStatusReport];
-        if (retryStatusReport) {
-            resolve(retryStatusReport);
-            return;
-        }
     }
 
     resolve(nil);
-}
-
-RCT_EXPORT_METHOD(recordStatusReported:(NSDictionary *)statusReport)
-{
-    [CodePushTelemetryManager recordStatusReported:statusReport];
-}
-
-RCT_EXPORT_METHOD(saveStatusReportForRetry:(NSDictionary *)statusReport)
-{
-    [CodePushTelemetryManager saveStatusReportForRetry:statusReport];
-}
-
-#pragma mark - RCTFrameUpdateObserver Methods
-
-- (void)didUpdateFrame:(RCTFrameUpdate *)update
-{
-    if (!_didUpdateProgress) {
-        return;
-    }
-
-    [self dispatchDownloadProgressEvent];
-    _didUpdateProgress = NO;
 }
 
 @end
